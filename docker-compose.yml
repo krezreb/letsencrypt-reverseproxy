@@ -1,0 +1,14 @@
+version : '3.0'
+
+services:
+    nginx:
+        image: jbeeson/letsencrypt-reverseproxy
+        ports:
+            - "80:80"
+            - "443:443"
+        env_file: .env
+        volumes:
+            - ssl:/ssl
+
+volumes:
+    ssl:
