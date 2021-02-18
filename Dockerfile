@@ -1,4 +1,4 @@
-FROM nginx:mainline-alpine
+FROM nginx:stable-alpine
 
 RUN mkdir -p /ssl
 
