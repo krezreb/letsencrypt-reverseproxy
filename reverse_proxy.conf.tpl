@@ -13,7 +13,6 @@ server {
     gzip_min_length  1000;
     gzip_proxied     expired no-cache no-store private auth;
     gzip_types       text/plain application/x-javascript text/xml text/css application/xml;
-    keepalive 100;
 
     listen 80 ;
     server_name _;
