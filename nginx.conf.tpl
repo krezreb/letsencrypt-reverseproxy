@@ -23,9 +23,10 @@ http {
         
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
+    
+    limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
 
     server {
-        limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
 
         listen 80 ;
         server_name _;

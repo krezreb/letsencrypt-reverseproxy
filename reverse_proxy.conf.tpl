@@ -15,12 +15,8 @@ server {
     gzip_types       text/plain application/x-javascript text/xml text/css application/xml;
     keepalive 100;
 
-    limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
-
     listen 80 ;
     server_name _;
-
-    limit_req zone=mylimit;
 
     client_body_buffer_size  10K;
     client_header_buffer_size 10k;
