@@ -24,9 +24,8 @@ http {
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
 
-    limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
-
     server {
+        limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
 
         listen 80 ;
         server_name _;
@@ -52,7 +51,7 @@ http {
         }
         
         # send to https
-    	return 301 https://$host$request_uri;
+    	return 301 https://$host:$FRONT_HTTPS_PORT$request_uri;
   
     }
 

@@ -13,6 +13,7 @@ ENV CERT_KEY_PATH=/ssl/privkey.pem
 ENV CERT_PATH=/ssl/cert.pem
 ENV ACME_CERT_PORT=8086
 ENV SETUP_REFRESH_FREQUENCY=86400
+ENV FRONT_HTTPS_PORT=443
 
 # reverse proxy config
 ENV PROXY_PASS_TARGET=http://example.com/path
@@ -23,7 +24,7 @@ EXPOSE 80 443
 
 RUN apk update -f \
   && apk --no-cache add -f \
-  openssl gettext bash python3 py-openssl \
+  openssl gettext bash python3 py3-pip py-openssl \
   coreutils \
   bind-tools \
   git \ 
