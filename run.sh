@@ -6,6 +6,20 @@ trap "kill -9 0" EXIT
 set -ue
 
 echo SETUP_REFRESH_FREQUENCY is $SETUP_REFRESH_FREQUENCY
+
+if [[ ${PROXY_PASS_TARGET:=""} == "" ]] ;  then
+    # in this case there is no nginx, this container only handles cert generating
+    echo ACME_CERT_PORT is $ACME_CERT_PORT
+    setupssl --port 80
+    # regularly check if ssl cert needs to be renewed
+    while true ;
+    do 
+        sleep  86000
+        setupssl --port $ACME_CERT_PORT
+    done
+    exit
+fi
+
 echo PROXY_PASS_TARGET is $PROXY_PASS_TARGET
 
 

@@ -43,7 +43,7 @@ class SetupSSLException(Exception):
 
 class SetupSSL(object):
 
-    def __init__(self, fqdn, my_hostname=None, check_ip_url='http://ip.42.pl/raw'):
+    def __init__(self, fqdn, my_hostname=None, check_ip_url='https://ifconfig.io/ip'):
         self.my_ip = None
         self.fqdn = fqdn
         self.my_hostname = my_hostname
@@ -71,7 +71,7 @@ class SetupSSL(object):
     def get_my_ip(self):
         
         if self.my_ip == None:
-            self.my_ip = urlopen(self.check_ip_url).read().decode("utf-8")
+            self.my_ip = urlopen(self.check_ip_url).read().decode("utf-8").strip()
     
             if self.my_hostname != None:
                 ip = socket.gethostbyname(self.my_hostname)
