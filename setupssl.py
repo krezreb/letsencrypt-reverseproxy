@@ -16,6 +16,8 @@ CERT_EMAIL = os.environ.get('CERT_EMAIL', None)
 CERT_FQDN = os.environ.get('CERT_FQDN', None)
 CERT_PATH = os.environ.get('CERT_PATH', '/var/ssl/domain/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
+CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
+CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
 
 def run(cmd, splitlines=False):
     # you had better escape cmd cause it's goin to the shell as is
@@ -161,6 +163,12 @@ if __name__ == '__main__':
             raise SetupSSLException("CERT_FQDN does not point to me.  CERT_FQDN={}, resolves to {}, my ip is {}".format(CERT_FQDN, ip, my_ip))
         log("")
         (change, fail) = s.get_le_cert(CERT_PATH, cert_email=args.email, expire_cutoff_days=CERT_EXPIRE_CUTOFF_DAYS, acme_cert_http_port=args.port)
+        if CERTFILE_UID != None:
+            run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(CERT_PATH)))
+
+        if CERTFILE_GID != None:
+            run("chgrp -R {} {}".format(CERTFILE_GID, os.path.dirname(CERT_PATH)))
+
     else:
         raise SetupSSLException("ERROR: CERT_FQDN environment variable not set")
 
