@@ -18,6 +18,7 @@ CERT_PATH = os.environ.get('CERT_PATH', '/var/ssl/domain/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
+CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
 
 def run(cmd, splitlines=False):
     # you had better escape cmd cause it's goin to the shell as is
@@ -84,7 +85,9 @@ class SetupSSL(object):
     
         return self.my_ip
     
-    def get_le_cert(self, cert_file, cert_email="you@example.com", expire_cutoff_days=31, acme_cert_http_port=80):
+
+
+    def get_le_cert(self, cert_file, expire_cutoff_days=31 ):
         change = False
         fail = False
         
@@ -106,8 +109,7 @@ class SetupSSL(object):
         
             if expires_in.days < expire_cutoff_days:
                 log("Trying to renew cert {}".format(self.fqdn))
-                cmd = "acme.sh --renew --standalone --httpport {} -d {}".format(acme_cert_http_port, self.fqdn)
-    
+                cmd = self.acme_renew_cmd()
                 (out, err, exitcode) = run(cmd)
                 
                 if exitcode == 0:
@@ -123,9 +125,7 @@ class SetupSSL(object):
                 log("Nothing to do for cert file {}".format(cert_file))
         else :
             log('cert_file {} not found'.format(cert_file))
-            cmd = "acme.sh --issue --standalone --httpport {} -d {}".format(acme_cert_http_port, self.fqdn)
-    
-            cmd += ' --accountemail {} '.format(cert_email)
+            cmd = self.acme_issue_cmd()
             (out, err, exitcode) = run(cmd)
             
             if exitcode != 0:
@@ -140,15 +140,51 @@ class SetupSSL(object):
         
         return (change, fail)
 
+class SetupSSLHttp(SetupSSL):
+    cert_email="you@example.com"
+    acme_cert_http_port=80
+
+    def acme_renew_cmd(self):
+        cmd = "acme.sh --renew --standalone --httpport {} -d {}".format(self.acme_cert_http_port, self.fqdn)
+        return cmd
+
+    def acme_issue_cmd(self):
+        cmd = "acme.sh --issue --standalone --httpport {} -d {} --email {} ".format(self.acme_cert_http_port, self.fqdn, self.cert_email)
+        return cmd
+
+class SetupSSLDns(SetupSSL):
+    challenge_dns_provider=""
+
+    def acme_renew_cmd(self):
+        cmd = "acme.sh --renew --dns {} -d {}".format(self.challenge_dns_provider, self.fqdn)
+        return cmd
+
+    def acme_issue_cmd(self):
+        cmd = "acme.sh --issue --dns {} -d {} --email {}".format(self.challenge_dns_provider, self.fqdn, self.cert_email)
+        return cmd
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=ACME_CERT_PORT, help='What port to use to issue certs')
 parser.add_argument('--email', default=CERT_EMAIL, help='What email to use to issue certs')
-args = parser.parse_args()
+parser.add_argument('--challenge-dns-provider', default=CHALLENGE_DNS_PROVIDER)
 
+args = parser.parse_args()
 
 if __name__ == '__main__':
 
-    s = SetupSSL(fqdn=CERT_FQDN)
+    if args.challenge_dns_provider != None:
+        # use dns challenge
+        s = SetupSSLDns(fqdn=CERT_FQDN)
+        s.challenge_dns_provider = args.challenge_dns_provider
+        log('Using DNS certificate generation with {}'.format(args.challenge_dns_provider))
+
+    else:
+        # use http challenge
+        s = SetupSSLHttp(fqdn=CERT_FQDN)
+        s.acme_cert_http_port=args.port
+
+    # email required in both cases
+    s.cert_email=args.email
 
     try:
         if not validate_email(args.email):
@@ -162,7 +198,7 @@ if __name__ == '__main__':
         if not success:
             raise SetupSSLException("CERT_FQDN does not point to me.  CERT_FQDN={}, resolves to {}, my ip is {}".format(CERT_FQDN, ip, my_ip))
         log("")
-        (change, fail) = s.get_le_cert(CERT_PATH, cert_email=args.email, expire_cutoff_days=CERT_EXPIRE_CUTOFF_DAYS, acme_cert_http_port=args.port)
+        (change, fail) = s.get_le_cert(CERT_PATH, expire_cutoff_days=CERT_EXPIRE_CUTOFF_DAYS)
         if CERTFILE_UID != None:
             run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(CERT_PATH)))
 

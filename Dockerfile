@@ -46,7 +46,7 @@ RUN pip3 install -r /requirements.txt
 # install acme bash implementation
 RUN mkdir -p /etc/acme \
     && cd /root \
-    && git clone https://github.com/Neilpang/acme.sh.git   \
+    && git clone https://github.com/acmesh-official/acme.sh.git   \
     && cd ./acme.sh \
     && ./acme.sh --install \
     --home /usr/local/bin \
