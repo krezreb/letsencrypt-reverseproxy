@@ -57,13 +57,13 @@ RUN mkdir -p /etc/acme \
 
 ADD *.py /usr/local/bin/
 RUN ln -s /usr/local/bin/setupssl.py  /usr/local/bin/setupssl
+RUN ln -s /usr/local/bin/setup.py  /usr/local/bin/setup
 ADD run.sh /run.sh
-RUN chmod +x /usr/local/bin/setupssl.py /run.sh
+RUN chmod +x /usr/local/bin/setup*.py /run.sh
 
-RUN rm /etc/nginx/conf.d/* 
-RUN rm /etc/nginx/nginx.conf
+RUN mkdir -p /etc/nginx/conf.d/* 
 
-ADD nginx.conf.tpl /etc/nginx/
+ADD nginx.conf /etc/nginx/
 ADD reverse_proxy.conf.tpl /etc/nginx/conf.d/
 
 CMD ["/run.sh"]
