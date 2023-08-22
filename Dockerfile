@@ -1,4 +1,4 @@
-FROM alpine:3
+FROM nginx:stable-alpine
 
 RUN mkdir -p /ssl
 
@@ -33,7 +33,6 @@ RUN apk update -f \
   bind-tools \
   git \ 
   build-deps build-base libffi-dev openssl-dev \
-  nginx libnginx-mod-http-dav-ext nginx-mod-http-dav-ext  nginx-extras nginx  \
   curl \
   socat \
   bash \
@@ -61,7 +60,7 @@ RUN ln -s /usr/local/bin/setup.py  /usr/local/bin/setup
 ADD run.sh /run.sh
 RUN chmod +x /usr/local/bin/setup*.py /run.sh
 
-RUN mkdir -p /etc/nginx/conf.d/* 
+RUN rm -rf /etc/nginx/conf.d/* 
 
 ADD nginx.conf /etc/nginx/
 ADD reverse_proxy.conf.tpl /etc/nginx/conf.d/
