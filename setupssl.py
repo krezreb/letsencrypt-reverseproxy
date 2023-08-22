@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, json
+import os, yaml
 from subprocess import Popen, PIPE
 from OpenSSL import crypto
 import datetime
@@ -20,6 +20,9 @@ CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
 CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
 
+# multiple target conf
+CONF_YML = os.environ.get('CONF_YML', None)
+
 def run(cmd, splitlines=False):
     # you had better escape cmd cause it's goin to the shell as is
     proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True)
@@ -36,10 +39,8 @@ def run(cmd, splitlines=False):
 
     return (out, err, exitcode)
 
-
 def log(s):
     print("SETUPSSL: {}".format(s))
-
 
 class SetupSSLException(Exception):
     pass
@@ -170,45 +171,77 @@ parser.add_argument('--challenge-dns-provider', default=CHALLENGE_DNS_PROVIDER)
 
 args = parser.parse_args()
 
-if __name__ == '__main__':
+def main(fqdn, cert_path, email, port, challenge_dns_provider=None, expire_cutoff_days=30):
 
-    if args.challenge_dns_provider != None:
+    if challenge_dns_provider != None:
         # use dns challenge
-        s = SetupSSLDns(fqdn=CERT_FQDN)
-        s.challenge_dns_provider = args.challenge_dns_provider
-        log('Using DNS certificate generation with {}'.format(args.challenge_dns_provider))
+        s = SetupSSLDns(fqdn=fqdn)
+        s.challenge_dns_provider = challenge_dns_provider
+        log('Using DNS certificate generation with {}'.format(challenge_dns_provider))
 
     else:
         # use http challenge
-        s = SetupSSLHttp(fqdn=CERT_FQDN)
-        s.acme_cert_http_port=args.port
+        s = SetupSSLHttp(fqdn=fqdn)
+        s.acme_cert_http_port=port
 
     # email required in both cases
-    s.cert_email=args.email
+    s.cert_email=email
 
     try:
-        if not validate_email(args.email):
+        if not validate_email(email):
             raise Exception()
     except:
-        raise SetupSSLException("CERT_EMAIL: The provided email for the certificate, {}, is not valid".format(args.email))
+        raise SetupSSLException("CERT_EMAIL: The provided email for the certificate, {}, is not valid".format(email))
 
-
-    if CERT_FQDN != None:
-        (success, domain, ip, my_ip) = s.points_to_me(CERT_FQDN)
+    if fqdn != None:
+        (success, domain, ip, my_ip) = s.points_to_me(fqdn)
         if not success:
-            raise SetupSSLException("CERT_FQDN does not point to me.  CERT_FQDN={}, resolves to {}, my ip is {}".format(CERT_FQDN, ip, my_ip))
+            raise SetupSSLException("CERT_FQDN does not point to me.  CERT_FQDN={}, resolves to {}, my ip is {}".format(fqdn, ip, my_ip))
         log("")
-        (change, fail) = s.get_le_cert(CERT_PATH, expire_cutoff_days=CERT_EXPIRE_CUTOFF_DAYS)
+        (change, fail) = s.get_le_cert(cert_path, expire_cutoff_days=expire_cutoff_days)
         if CERTFILE_UID != None:
-            run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(CERT_PATH)))
+            run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(cert_path)))
 
         if CERTFILE_GID != None:
-            run("chgrp -R {} {}".format(CERTFILE_GID, os.path.dirname(CERT_PATH)))
+            run("chgrp -R {} {}".format(CERTFILE_GID, os.path.dirname(cert_path)))
 
     else:
         raise SetupSSLException("ERROR: CERT_FQDN environment variable not set")
 
-     
-                    
+
+if __name__ == '__main__':
+
+    if CONF_YML != None:
+        if os.path.exists(CONF_YML):
+            with open(CONF_YML) as f:
+                conf = yaml.load(f, Loader=yaml.FullLoader)
+
+            for cert_fqdn,v in conf["conf"].items():
+                vars = os.environ.copy()
+                if "target" not in v:
+                    log("no target provided for {}, skipping".format(k))
+                    continue
+
+                cert_path = '/ssl/{}/cert.pem'.format(cert_fqdn)
+
+                if not os.path.isdir(os.path.dirname(cert_path)):
+                    os.makedirs(os.path.dirname(cert_path))
+
+                email = args.email
+                if "email" in v:
+                    email = v["email"]
+
+                challenge_dns_provider = args.challenge_dns_provider
+                if "challenge_dns_provider" in v:
+                    challenge_dns_provider = v["challenge_dns_provider"]
+
+                try:
+                    main(cert_fqdn, cert_path, email, args.port, challenge_dns_provider, args.expire_cutoff_days)
+                except SetupSSLException:
+                    continue
+                
+    else:
+        main(args.cert_fqdn, CERT_PATH, args.email, args.port, args.challenge_dns_provider, args.expire_cutoff_days)
+  
 
         

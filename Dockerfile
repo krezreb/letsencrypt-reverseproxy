@@ -1,4 +1,4 @@
-FROM nginx:stable-alpine
+FROM alpine:3
 
 RUN mkdir -p /ssl
 
@@ -22,7 +22,7 @@ ENV PROXY_SSL_TRUSTED_CERTIFICATE=/ssl/cert.pem
 ENV PROXY_SSL_VERIFY=off
 ENV AUTH_BASIC=""
 ENV AUTH_BASIC_USER_FILE=""
-ENV REVERSE_PROXY_YML=""
+ENV CONF_YML="/config.yml"
 
 EXPOSE 80 443
 
@@ -33,6 +33,7 @@ RUN apk update -f \
   bind-tools \
   git \ 
   build-deps build-base libffi-dev openssl-dev \
+  nginx libnginx-mod-http-dav-ext nginx-mod-http-dav-ext  nginx-extras nginx  \
   curl \
   socat \
   bash \
