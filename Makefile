@@ -4,3 +4,8 @@ build:
 
 push: build
 	docker push jbeeson/letsencrypt-reverseproxy
+	
+
+push_test:
+	rsync -ardv . $(SSH_TARGET):~/letsencrypt-reverseproxy
+	ssh $(SSH_TARGET) bash -c "'cd letsencrypt-reverseproxy && make build'"
