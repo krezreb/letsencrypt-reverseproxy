@@ -238,7 +238,7 @@ if __name__ == '__main__':
 
             vars = os.environ.copy()
             if "PROXY_PASS_TARGET" not in v:
-                log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
+                log("no PROXY_PASS_TARGET provided for {}, skipping".format(cert_fqdn))
                 continue
 
             cert_path = '/ssl/{}/cert.pem'.format(cert_fqdn)
