@@ -8,7 +8,6 @@ set -ue
 setup
 
 if [[ ${PROXY_PASS_TARGET:=""} != "" ]] ;  then
-    echo PROXY_PASS_TARGET is $PROXY_PASS_TARGET
 
     if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
         echo ACME_CERT_PORT is $ACME_CERT_PORT

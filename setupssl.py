@@ -14,7 +14,7 @@ from validate_email import validate_email
 ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 80))
 CERT_EMAIL = os.environ.get('CERT_EMAIL', None)
 CERT_FQDN = os.environ.get('CERT_FQDN', None)
-CERT_PATH = os.environ.get('CERT_PATH', '/var/ssl/domain/cert.pem')
+CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
@@ -23,9 +23,9 @@ CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
 # multiple target conf
 CONF_YML = os.environ.get('CONF_YML', None)
 
-def run(cmd, splitlines=False):
+def run(cmd, splitlines=False, env=os.environ.copy()):
     # you had better escape cmd cause it's goin to the shell as is
-    proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True)
+    proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True, env=env)
     out, err = proc.communicate()
     if splitlines:
         out_split = []
@@ -94,6 +94,17 @@ class SetupSSL(object):
         
         log('get_le_cert()')
         
+        cert_dir = os.path.dirname(cert_file)
+
+        acme_env = os.environ.copy()
+
+        acme_env["DOMAIN_PATH"] = cert_dir
+        acme_env["DOMAIN_CONF"] = "{}/domain.conf".format(cert_dir)
+        acme_env["DOMAIN_SSL_CONF"] = "{}/domain.csr.conf".format(cert_dir)
+        acme_env["CSR_PATH"] = "{}/csr.csr".format(cert_dir)
+        acme_env["CERT_KEY_PATH"] = "{}/privkey.pem".format(cert_dir)
+        acme_env["CERT_PATH"] = "{}/cert.pem".format(cert_dir)
+
         if os.path.isfile(cert_file):
             log('cert_file {} found'.format(cert_file))
             
@@ -111,7 +122,7 @@ class SetupSSL(object):
             if expires_in.days < expire_cutoff_days:
                 log("Trying to renew cert {}".format(self.fqdn))
                 cmd = self.acme_renew_cmd()
-                (out, err, exitcode) = run(cmd)
+                (out, err, exitcode) = run(cmd, env=acme_env)
                 
                 if exitcode == 0:
                     log("RENEW SUCCESS: Certificate {} successfully renewed".format(self.fqdn))
@@ -126,8 +137,12 @@ class SetupSSL(object):
                 log("Nothing to do for cert file {}".format(cert_file))
         else :
             log('cert_file {} not found'.format(cert_file))
+
+            if not os.path.isdir(cert_dir):
+                os.makedirs(cert_dir)
+                
             cmd = self.acme_issue_cmd()
-            (out, err, exitcode) = run(cmd)
+            (out, err, exitcode) = run(cmd, env=acme_env)
             
             if exitcode != 0:
                 log("Requesting cert for {}: FAILED".format(self.fqdn))
@@ -181,6 +196,7 @@ def main(fqdn, cert_path, email, port, challenge_dns_provider=None, expire_cutof
 
     else:
         # use http challenge
+        log('Using DNS certificate generation with http challenge')
         s = SetupSSLHttp(fqdn=fqdn)
         s.acme_cert_http_port=port
 
@@ -193,55 +209,58 @@ def main(fqdn, cert_path, email, port, challenge_dns_provider=None, expire_cutof
     except:
         raise SetupSSLException("CERT_EMAIL: The provided email for the certificate, {}, is not valid".format(email))
 
-    if fqdn != None:
-        (success, domain, ip, my_ip) = s.points_to_me(fqdn)
-        if not success:
-            raise SetupSSLException("CERT_FQDN does not point to me.  CERT_FQDN={}, resolves to {}, my ip is {}".format(fqdn, ip, my_ip))
-        log("")
-        (change, fail) = s.get_le_cert(cert_path, expire_cutoff_days=expire_cutoff_days)
-        if CERTFILE_UID != None:
-            run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(cert_path)))
+    if fqdn == None:
+        raise SetupSSLException("ERROR: no certificate fqdn set")
 
-        if CERTFILE_GID != None:
-            run("chgrp -R {} {}".format(CERTFILE_GID, os.path.dirname(cert_path)))
+    (success, domain, ip, my_ip) = s.points_to_me(fqdn)
+    if not success:
+        raise SetupSSLException("certificate fqdn, ({}) does not point to me.  FQDN resolves to {}, my ip is {}".format(fqdn, ip, my_ip))
+    log("")
+    (change, fail) = s.get_le_cert(cert_path, expire_cutoff_days=expire_cutoff_days)
 
-    else:
-        raise SetupSSLException("ERROR: CERT_FQDN environment variable not set")
+    if CERTFILE_UID != None:
+        run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(cert_path)))
 
+    if CERTFILE_GID != None:
+        run("chgrp -R {} {}".format(CERTFILE_GID, os.path.dirname(cert_path)))
+    
 
 if __name__ == '__main__':
 
-    if CONF_YML != None:
-        if os.path.exists(CONF_YML):
-            with open(CONF_YML) as f:
-                conf = yaml.load(f, Loader=yaml.FullLoader)
+    if CONF_YML != None and os.path.exists(CONF_YML):
+        log("reading {}".format(CONF_YML))
 
-            for cert_fqdn,v in conf["conf"].items():
-                vars = os.environ.copy()
-                if "target" not in v:
-                    log("no target provided for {}, skipping".format(k))
-                    continue
+        with open(CONF_YML) as f:
+            conf = yaml.load(f, Loader=yaml.FullLoader)
 
-                cert_path = '/ssl/{}/cert.pem'.format(cert_fqdn)
+        for cert_fqdn,v in conf["conf"].items():
+            log("handing {}".format(cert_fqdn))
 
-                if not os.path.isdir(os.path.dirname(cert_path)):
-                    os.makedirs(os.path.dirname(cert_path))
+            vars = os.environ.copy()
+            if "PROXY_PASS_TARGET" not in v:
+                log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
+                continue
 
-                email = args.email
-                if "email" in v:
-                    email = v["email"]
+            cert_path = '/ssl/{}/cert.pem'.format(cert_fqdn)
 
-                challenge_dns_provider = args.challenge_dns_provider
-                if "challenge_dns_provider" in v:
-                    challenge_dns_provider = v["challenge_dns_provider"]
+            if not os.path.isdir(os.path.dirname(cert_path)):
+                os.makedirs(os.path.dirname(cert_path))
 
-                try:
-                    main(cert_fqdn, cert_path, email, args.port, challenge_dns_provider, args.expire_cutoff_days)
-                except SetupSSLException:
-                    continue
+            email = args.email
+            if "CERT_EMAIL" in v:
+                email = v["CERT_EMAIL"]
+
+            challenge_dns_provider = args.challenge_dns_provider
+            if "CHALLENGE_DNS_PROVIDER" in v:
+                challenge_dns_provider = v["CHALLENGE_DNS_PROVIDER"]
+
+            try:
+                main(cert_fqdn, cert_path, email, args.port, challenge_dns_provider, CERT_EXPIRE_CUTOFF_DAYS)
+            except SetupSSLException:
+                continue
                 
     else:
-        main(args.cert_fqdn, CERT_PATH, args.email, args.port, args.challenge_dns_provider, args.expire_cutoff_days)
+        main(CERT_FQDN, CERT_PATH, args.email, args.port, args.challenge_dns_provider, CERT_EXPIRE_CUTOFF_DAYS)
   
 
         

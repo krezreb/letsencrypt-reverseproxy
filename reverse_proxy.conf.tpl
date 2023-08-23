@@ -31,9 +31,11 @@ server {
 
 server {
     
-	listen 443 ssl http2 $DEFAULT_SERVER;
-	listen [::]:443 ssl http2 $DEFAULT_SERVER;
-	
+    listen 443 ssl http2 $DEFAULT_SERVER;
+    #listen [::]:443 ssl http2 $DEFAULT_SERVER;
+
+    server_name $SERVER_NAME;
+
     ssl_certificate         $CERT_PATH;
     ssl_certificate_key     $CERT_KEY_PATH;
 
@@ -42,8 +44,6 @@ server {
     gzip_min_length  1000;
     gzip_proxied     expired no-cache no-store private auth;
     gzip_types       text/plain application/x-javascript text/xml text/css application/xml;
-
-    server_name $SERVER_NAME;
     
     client_body_buffer_size  10K;
     client_header_buffer_size 10k;
