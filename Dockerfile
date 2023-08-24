@@ -1,5 +1,4 @@
-#FROM nginx:stable-alpine
-FROM alpine:3
+FROM nginx:stable-alpine
 
 RUN mkdir -p /ssl
 
@@ -37,7 +36,6 @@ RUN apk update -f \
   bind-tools \
   git \ 
   build-deps build-base libffi-dev openssl-dev \
-    nginx libnginx-mod-http-dav-ext nginx-mod-http-dav-ext  nginx-extras nginx \
   curl \
   socat \
   bash \
