@@ -3,7 +3,7 @@ server {
     listen 80 ;
     server_name $SERVER_NAME;
 
-    limit_req zone=mylimit;
+    limit_req zone=mylimit burst=10;
 
     client_body_buffer_size  10K;
     client_header_buffer_size 10k;
