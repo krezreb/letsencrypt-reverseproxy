@@ -78,16 +78,24 @@ if __name__ == '__main__':
             vars["CERT_KEY_PATH"] = '/ssl/{}/privkey.pem'.format(k)
 
             vars["PROXY_PASS_TARGET"] = v["PROXY_PASS_TARGET"]
+            
             vars["DEFAULT_SERVER"] =  ""
 
             if "IS_DEFAULT" in v:
-                vars["DEFAULT_SERVER"] =  "default_server"
+                vars["DEFAULT_SERVER"] = "default_server"
 
             vars["SERVER_NAME"] = k
 
             basic_auth_file = None
             if "AUTH_BASIC_USER_FILE" in v:
                 basic_auth_file = v["AUTH_BASIC_USER_FILE"]
+
+            extra_options = []
+            for i,val in v.items():
+                if i == i.lower():
+                    extra_options.append('{} "{}";'.format(i, val))
+
+            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)
 
             applied_template = apply_template(TEMPLATE_FILE, vars, basic_auth_file)
 

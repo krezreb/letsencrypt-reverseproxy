@@ -53,9 +53,7 @@ server {
     location / {
         $AUTH_BASIC
         $AUTH_BASIC_USER_FILE
-    
-        proxy_ssl_trusted_certificate $PROXY_SSL_TRUSTED_CERTIFICATE;
-        proxy_ssl_verify $PROXY_SSL_VERIFY;
+
         client_max_body_size 0;
 
         proxy_set_header X-Real-IP $remote_addr;
@@ -63,6 +61,12 @@ server {
         proxy_set_header Host $http_host;
         proxy_pass $PROXY_PASS_TARGET;
 
+        $EXTRA_OPTIONS
+        #proxy_ssl $PROXY_SSL;
+        #proxy_ssl_trusted_certificate $PROXY_SSL_TRUSTED_CERTIFICATE;
+        #proxy_ssl_verify $PROXY_SSL_VERIFY;
+
+        
         # For websockets
         proxy_redirect off;
         proxy_http_version 1.1;
