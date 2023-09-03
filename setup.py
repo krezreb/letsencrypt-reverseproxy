@@ -2,6 +2,7 @@
 
 import os, yaml, time, sys
 from subprocess import Popen, PIPE
+import hashlib
 
 # SSL cert stuff
 ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 80))
@@ -43,13 +44,17 @@ def apply_template( template_path, vars, basic_auth_file=None):
         template = fh.read()
 
     if basic_auth_file != None:
-        vars["AUTH_BASIC"] = "auth_basic \"HTTP Authentication Required\";"
+        if "AUTH_BASIC" in vars:
+            vars["AUTH_BASIC"] = "auth_basic \"{}\";".format(vars["AUTH_BASIC"])
+        else:
+            vars["AUTH_BASIC"] = "auth_basic \"HTTP Authentication Required\";"
+
         vars["AUTH_BASIC_USER_FILE"] = 'auth_basic_user_file "{}";'.format(basic_auth_file)
     else:
         vars["AUTH_BASIC"] = ""
         vars["AUTH_BASIC_USER_FILE"] = ""
 
-
+    vars["LIMIT_ZONE"] = hashlib.sha224(vars['PROXY_PASS_TARGET'].encode('utf-8')).hexdigest()
     ks = list(vars.keys())
     ks.sort(key=len, reverse=True)
     for k in ks:
