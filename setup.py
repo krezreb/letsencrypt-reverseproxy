@@ -77,7 +77,7 @@ if __name__ == '__main__':
                 log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
                 continue
 
-            cert_path = '/ssl/{}/cert.pem'.format(k)
+            cert_path = '/ssl/{}/fullchain.cer'.format(k)
 
             vars["CERT_PATH"] = cert_path
             vars["CERT_KEY_PATH"] = '/ssl/{}/privkey.pem'.format(k)
