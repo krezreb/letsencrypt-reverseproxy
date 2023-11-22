@@ -17,6 +17,7 @@ CERT_FQDN = os.environ.get('CERT_FQDN', None)
 CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
+ACME_CA_SERVER = os.environ.get('ACME_CA_SERVER', "ssl.com")
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
 CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
 
@@ -156,27 +157,34 @@ class SetupSSL(object):
         
         return (change, fail)
 
+
+    @property
+    def acme_cli(self):
+        cmd = "acme.sh "
+        cmd += " --server {} ".format(ACME_CA_SERVER)    
+        return cmd
+    
 class SetupSSLHttp(SetupSSL):
     cert_email="you@example.com"
     acme_cert_http_port=80
 
     def acme_renew_cmd(self):
-        cmd = "acme.sh --renew --standalone --httpport {} -d {}".format(self.acme_cert_http_port, self.fqdn)
+        cmd = "{} --renew --standalone --httpport {} -d {}".format(self.acme_cli, self.acme_cert_http_port, self.fqdn)
         return cmd
 
     def acme_issue_cmd(self):
-        cmd = "acme.sh --issue --standalone --httpport {} -d {} --email {} ".format(self.acme_cert_http_port, self.fqdn, self.cert_email)
+        cmd = "{} --issue --standalone --httpport {} -d {} --email {} ".format(self.acme_cli, self.acme_cert_http_port, self.fqdn, self.cert_email)
         return cmd
 
 class SetupSSLDns(SetupSSL):
     challenge_dns_provider=""
 
     def acme_renew_cmd(self):
-        cmd = "acme.sh --renew --dns {} -d {}".format(self.challenge_dns_provider, self.fqdn)
+        cmd = "{} --renew --dns {} -d {}".format(self.acme_cli, self.challenge_dns_provider, self.fqdn)
         return cmd
 
     def acme_issue_cmd(self):
-        cmd = "acme.sh --issue --dns {} -d {} --email {}".format(self.challenge_dns_provider, self.fqdn, self.cert_email)
+        cmd = "{} --issue --dns {} -d {} --email {}".format(self.acme_cli, self.challenge_dns_provider, self.fqdn, self.cert_email)
         return cmd
 
 parser = argparse.ArgumentParser()
