@@ -17,7 +17,7 @@ CERT_FQDN = os.environ.get('CERT_FQDN', None)
 CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
-ACME_CA_SERVER = os.environ.get('ACME_CA_SERVER', "ssl.com")
+ACME_CA_SERVER = os.environ.get('ACME_CA_SERVER', "zerossl")
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
 CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
 
@@ -162,6 +162,7 @@ class SetupSSL(object):
     def acme_cli(self):
         cmd = "acme.sh "
         cmd += " --server {} ".format(ACME_CA_SERVER)    
+        cmd += " --email {} ".format(CERT_EMAIL)    
         return cmd
     
 class SetupSSLHttp(SetupSSL):

@@ -9,6 +9,8 @@ services:
         env_file: .env
         volumes:
             - ssl:/ssl
+            - etc_acme:/etc/acme
 
 volumes:
     ssl:
+    etc_acme:
