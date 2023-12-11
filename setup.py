@@ -96,6 +96,12 @@ if __name__ == '__main__':
                 basic_auth_file = v["AUTH_BASIC_USER_FILE"]
 
             extra_options = []
+
+            if "SKIP_PROXY_HEADERS" not in v:
+                extra_options.append("proxy_set_header X-Real-IP $remote_addr;")
+                extra_options.append("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;")
+                extra_options.append("proxy_set_header Host $http_host;")
+
             for i,val in v.items():
                 if i == i.lower():
                     extra_options.append('{} "{}";'.format(i, val))

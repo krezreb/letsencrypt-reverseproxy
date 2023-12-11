@@ -1,3 +1,3 @@
 conf:
     local.jumidev.com:
-        target: http://jumiserv1.local:8080
+        PROXY_PASS_TARGET: http://jumiserv1.local:8080
