@@ -65,7 +65,7 @@ RUN chmod +x /usr/local/bin/setup*.py /run.sh
 
 RUN rm -rf /etc/nginx/conf.d/* 
 
-ADD nginx.conf /etc/nginx/
+ADD nginx.conf.tpl /etc/nginx/
 ADD reverse_proxy.conf.tpl /etc/nginx/conf.d/
 
 CMD ["/run.sh"]

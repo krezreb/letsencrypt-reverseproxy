@@ -13,9 +13,10 @@ http {
     
     default_type  application/octet-stream;    
 
-    access_log  /dev/stdout   ;
-    error_log  /dev/stderr    ;
+    log_format vhost '$host - $remote_addr - $remote_user [$time_local] "$request" ' '$status $body_bytes_sent "$http_referer" ' '"$http_user_agent" $request_time';
 
+    $ACCESS_LOG
+    $ERROR_LOG
 
     charset utf-8;
     server_tokens off;

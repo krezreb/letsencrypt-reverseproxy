@@ -22,6 +22,8 @@ AUTH_BASIC_USER_FILE = os.environ.get('AUTH_BASIC_USER_FILE', None)
 # multiple target conf
 CONF_YML = os.environ.get('CONF_YML', None)
 
+TEMPLATE_FILE_NGINX = os.environ.get('TEMPLATE_FILE_NGINX', '/etc/nginx/nginx.conf.tpl')
+CONFIG_FILE_NGINX = os.environ.get('CONFIG_FILE_NGINX', '/etc/nginx/nginx.conf')
 TEMPLATE_FILE = os.environ.get('TEMPLATE_FILE', '/etc/nginx/conf.d/reverse_proxy.conf.tpl')
 CONF_OUT_DIR = os.environ.get('CONF_OUT_DIR', '/etc/nginx/conf.d/')
 
@@ -69,6 +71,20 @@ if __name__ == '__main__':
         log("reading {}".format(CONF_YML))
         with open(CONF_YML) as f:
             conf = yaml.load(f, Loader=yaml.FullLoader)
+
+        vars = os.environ.copy()
+        vars["ACCESS_LOG"]  = "access_log  /dev/stdout vhost;"
+        vars["ERROR_LOG"]  = "error_log  /dev/stderr;"
+
+        if "access_log" in conf:
+            vars["ACCESS_LOG"] += "\naccess_log {} vhost;".format(conf["access_log"])
+        if "error_log" in conf:
+            vars["ERROR_LOG"] += "\nerror_log {};".format(conf["error_log"])
+
+        applied_template = apply_template(TEMPLATE_FILE_NGINX, vars)
+
+        with open(CONFIG_FILE_NGINX, "w") as fh:
+            fh.write(applied_template)
 
         for k,v in conf["conf"].items():
             vars = os.environ.copy()
