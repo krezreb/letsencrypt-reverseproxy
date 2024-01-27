@@ -4,7 +4,7 @@ services:
     nginx:
         image: jbeeson/letsencrypt-reverseproxy
         ports:
-            - "80:80"
+            - "80:8080"
             - "443:443"
         env_file: .env
         volumes:

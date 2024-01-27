@@ -1,10 +1,9 @@
 build:
 	docker pull nginx:stable-alpine
-	docker build . -t jbeeson/letsencrypt-reverseproxy
+	docker build . -t jbeeson/letsencrypt-reverseproxy -t jbeeson/letsencrypt-reverseproxy:`git branch --show-current`
 
 push: build
 	docker push jbeeson/letsencrypt-reverseproxy
-	
 
 push_branch: build
 	docker build . -t jbeeson/letsencrypt-reverseproxy:`git branch --show-current`

@@ -12,7 +12,7 @@ ENV CERT_KEY_PATH=/ssl/privkey.pem
 ENV CERT_PATH=/ssl/cert.pem
 
 ENV LE_CONFIG_HOME=/etc/acme
-ENV ACME_CERT_PORT=8086
+#ENV ACME_CERT_PORT=8086
 ENV SETUP_REFRESH_FREQUENCY=86400
 ENV FRONT_HTTPS_PORT=443
 
@@ -27,7 +27,8 @@ ENV CONF_YML="/config.yml"
 ENV CONF_OUT_DIR=/etc/nginx/conf.d
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 80 443
+
+EXPOSE 8080 443
 
 RUN apk update -f \
   && apk --no-cache add -f \
@@ -46,10 +47,14 @@ ADD requirements.txt /
 
 RUN pip3 install -r /requirements.txt
 
+
 # install acme bash implementation
+
+ENV ACME_RELEASE=3.0.7
+
 RUN mkdir -p /etc/acme \
     && cd /root \
-    && git clone https://github.com/acmesh-official/acme.sh.git   \
+    && git clone https://github.com/acmesh-official/acme.sh.git -b $ACME_RELEASE \
     && cd ./acme.sh \
     && ./acme.sh --install \
     --home /usr/local/bin \
@@ -66,6 +71,6 @@ RUN chmod +x /usr/local/bin/setup*.py /run.sh
 RUN rm -rf /etc/nginx/conf.d/* 
 
 ADD nginx.conf.tpl /etc/nginx/
-ADD reverse_proxy.conf.tpl /etc/nginx/conf.d/
+ADD nginx_*.conf.tpl /etc/nginx/conf.d/
 
 CMD ["/run.sh"]

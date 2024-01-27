@@ -3,12 +3,17 @@
 import os, yaml, time, sys
 from subprocess import Popen, PIPE
 import hashlib
+import argparse
+from OpenSSL import crypto
+
+DEBUG = os.environ.get('DEBUG', None)
+
 
 # SSL cert stuff
-ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 80))
+ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 8086))
 CERT_EMAIL = os.environ.get('CERT_EMAIL', None)
 CERT_FQDN = os.environ.get('CERT_FQDN', None)
-CERT_PATH = os.environ.get('CERT_PATH', '/var/ssl/domain/cert.pem')
+CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
@@ -24,7 +29,8 @@ CONF_YML = os.environ.get('CONF_YML', None)
 
 TEMPLATE_FILE_NGINX = os.environ.get('TEMPLATE_FILE_NGINX', '/etc/nginx/nginx.conf.tpl')
 CONFIG_FILE_NGINX = os.environ.get('CONFIG_FILE_NGINX', '/etc/nginx/nginx.conf')
-TEMPLATE_FILE = os.environ.get('TEMPLATE_FILE', '/etc/nginx/conf.d/reverse_proxy.conf.tpl')
+TEMPLATE_FILE_HTTP = os.environ.get('TEMPLATE_FILE_HTTP', '/etc/nginx/conf.d/nginx_http.conf.tpl')
+TEMPLATE_FILE_HTTPS = os.environ.get('TEMPLATE_FILE_HTTPS', '/etc/nginx/conf.d/nginx_https.conf.tpl')
 CONF_OUT_DIR = os.environ.get('CONF_OUT_DIR', '/etc/nginx/conf.d/')
 
 def run(cmd, env=os.environ.copy()):
@@ -39,7 +45,16 @@ def run(cmd, env=os.environ.copy()):
 def log(s):
     print("SETUP: {}".format(s))
 
-def apply_template( template_path, vars, basic_auth_file=None):
+
+def debug(s):
+    if DEBUG != None:
+        print("SETUP DEBUG: {}".format(s))
+
+def apply_template( template_path, invars, basic_auth_file=None):
+
+    # make a copy to prevent mods to vars in function from
+    # spilling back up to caller
+    vars = invars.copy()
 
     #open text file in read mode
     with open(template_path, "r") as fh:
@@ -62,11 +77,18 @@ def apply_template( template_path, vars, basic_auth_file=None):
     for k in ks:
         template = template.replace("${}".format(k), vars[k])
     
+    debug(vars)
+
     return template
 
 
 if __name__ == '__main__':
 
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--http-only', action='store_true', help='What port to use to issue certs')
+    # parser.add_argument('--http-only', action='store_true', help='What port to use to issue certs')
+    # args = parser.parse_args()
+    
     if CONF_YML != None and os.path.exists(CONF_YML):
         log("reading {}".format(CONF_YML))
         with open(CONF_YML) as f:
@@ -86,17 +108,30 @@ if __name__ == '__main__':
         with open(CONFIG_FILE_NGINX, "w") as fh:
             fh.write(applied_template)
 
+        # fqdns = []
+
+        # for k,v in conf["conf"].items():
+        #     fqdns.append(k)
+
+        cert_path = '/ssl/fullchain.cer'
+
+        # no cert, yet
+        subject_str = ""
+        
+        if os.path.isfile(cert_path):
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(cert_path).read())
+            subject = cert.get_subject()
+            subject_str = "".join("/{:s}={:s}".format(name.decode(), value.decode()) for name, value in subject.get_components())
+
+
+
         for k,v in conf["conf"].items():
+
             vars = os.environ.copy()
             log("handing {}".format(k))
             if "PROXY_PASS_TARGET" not in v:
                 log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
                 continue
-
-            cert_path = '/ssl/{}/fullchain.cer'.format(k)
-
-            vars["CERT_PATH"] = cert_path
-            vars["CERT_KEY_PATH"] = '/ssl/{}/privkey.pem'.format(k)
 
             vars["PROXY_PASS_TARGET"] = v["PROXY_PASS_TARGET"]
             
@@ -124,9 +159,29 @@ if __name__ == '__main__':
 
             vars["EXTRA_OPTIONS"] = "\n".join(extra_options)
 
-            applied_template = apply_template(TEMPLATE_FILE, vars, basic_auth_file)
+            applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, basic_auth_file)
 
-            template_path = "{}/{}.conf".format(CONF_OUT_DIR, k)
+            template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, k)
+            log("saving nginx config to {}".format(template_path))
+            with open(template_path, "w") as fh:
+                fh.write(applied_template)
+
+            debug(TEMPLATE_FILE_HTTP)
+            debug(applied_template)
+
+            # domain not in cert
+            # or cert does not exist
+            if k not in subject_str:
+                continue
+
+            # vars["CERT_PATH"] = cert_path
+            # vars["CERT_KEY_PATH"] = '/ssl/privkey.pem'
+
+            applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, basic_auth_file)
+            debug(TEMPLATE_FILE_HTTPS)
+            debug(applied_template)
+
+            template_path = "{}/{}_https.conf".format(CONF_OUT_DIR, k)
             log("saving nginx config to {}".format(template_path))
             with open(template_path, "w") as fh:
                 fh.write(applied_template)
@@ -136,11 +191,11 @@ if __name__ == '__main__':
         # in this case there is no nginx, this container only handles cert generating
         log("ACME_CERT_PORT is {}".format(ACME_CERT_PORT))
 
-        run("setupssl --port 80")
+        run("setupssl")
         # regularly check if ssl cert needs to be renewed
         while True:
             time.sleep(86000)
-            run("setupssl --port {}".format(ACME_CERT_PORT))
+            run("setupssl")
 
     else:
         log("PROXY_PASS_TARGET is {}".format(PROXY_PASS_TARGET))
@@ -148,10 +203,17 @@ if __name__ == '__main__':
         vars = os.environ.copy()
         vars["DEFAULT_SERVER"] =  "default_server"
 
-        applied_template = apply_template(TEMPLATE_FILE, vars, AUTH_BASIC_USER_FILE)
+        applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, AUTH_BASIC_USER_FILE)
 
-        with open("{}/reverse_proxy.conf".format(CONF_OUT_DIR), "w") as fh:
+        with open("{}/reverse_proxy_http.conf".format(CONF_OUT_DIR), "w") as fh:
             fh.write(applied_template)
 
 
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(cert_file).read())
+
+
+            applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, AUTH_BASIC_USER_FILE)
+
+            with open("{}/reverse_proxy_https.conf".format(CONF_OUT_DIR), "w") as fh:
+                fh.write(applied_template)
 
