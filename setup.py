@@ -4,9 +4,11 @@ import os, yaml, time, sys
 from subprocess import Popen, PIPE
 import hashlib
 import argparse
-from OpenSSL import crypto
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 
 DEBUG = os.environ.get('DEBUG', None)
+
 
 
 # SSL cert stuff
@@ -116,14 +118,13 @@ if __name__ == '__main__':
         cert_path = '/ssl/fullchain.cer'
 
         # no cert, yet
-        subject_str = ""
+        cert_sans = []
         
         if os.path.isfile(cert_path):
-            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(cert_path).read())
-            subject = cert.get_subject()
-            subject_str = "".join("/{:s}={:s}".format(name.decode(), value.decode()) for name, value in subject.get_components())
+            cert = x509.load_pem_x509_certificate(open(cert_path, 'rb').read(), default_backend())
 
-
+            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            cert_sans = san.value.get_values_for_type(x509.DNSName)
 
         for k,v in conf["conf"].items():
 
@@ -171,7 +172,7 @@ if __name__ == '__main__':
 
             # domain not in cert
             # or cert does not exist
-            if k not in subject_str:
+            if k not in cert_sans:
                 continue
 
             # vars["CERT_PATH"] = cert_path
