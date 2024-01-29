@@ -209,10 +209,6 @@ if __name__ == '__main__':
         with open("{}/reverse_proxy_http.conf".format(CONF_OUT_DIR), "w") as fh:
             fh.write(applied_template)
 
-
-            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(cert_file).read())
-
-
             applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, AUTH_BASIC_USER_FILE)
 
             with open("{}/reverse_proxy_https.conf".format(CONF_OUT_DIR), "w") as fh:
