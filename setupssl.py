@@ -3,12 +3,18 @@
 import os, yaml
 from subprocess import Popen, PIPE
 from OpenSSL import crypto
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+
 import datetime
 from urllib.parse import urlparse
 from urllib.request import urlopen
 import socket
 import argparse
 from validate_email import validate_email
+import tempfile
+from pathlib import Path
+import shutil
 
 # SSL cert stuff
 ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 8086))
@@ -95,8 +101,35 @@ class SetupSSL(object):
         return self.my_ip
     
 
+    def check_cert(self):
 
-    def get_le_cert(self, cert_file, expire_cutoff_days=31 ):
+        cert_exists = False
+        cert_matches_conf = False
+        expires_in_days = -1
+
+        if os.path.isfile(self.cert_file):
+            log('cert_file {} found'.format(self.cert_file))
+            cert_exists = True
+            # cert already exists
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.cert_file).read())
+            exp = datetime.datetime.strptime(cert.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
+            
+            expires_in = exp - datetime.datetime.utcnow()
+      
+            cert = x509.load_pem_x509_certificate(open(cert_path, 'rb').read(), default_backend())
+
+            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            cert_sans = san.value.get_values_for_type(x509.DNSName)
+
+            cert_matches_conf = True
+            for d in self.fqdns:
+                if d not in cert_sans:
+                    cert_matches_conf = False
+                    break
+
+        return cert_exists, cert_matches_conf, expires_in.days
+
+    def get_le_cert(self):
         change = False
         fail = False
         
@@ -114,21 +147,17 @@ class SetupSSL(object):
         # acme_env["CERT_KEY_PATH"] = "{}/privkey.pem".format(cert_dir)
         # acme_env["CERT_PATH"] = "{}/cert.pem".format(cert_dir)
 
-        if os.path.isfile(cert_file):
-            log('cert_file {} found'.format(cert_file))
-            
-            # cert already exists
-            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(cert_file).read())
-            exp = datetime.datetime.strptime(cert.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
-            
-            expires_in = exp - datetime.datetime.utcnow()
-            
-            if expires_in.days <= 0:
+        cert_exists, cert_matches_conf, expires_in_days = self.check_cert()
+
+        if cert_matches_conf:
+            log('cert_file {} matches config'.format(self.cert_file))
+
+            if expires_in_days <= 0:
                 log("Found cert {} EXPIRED".format(", ".join(self.fqdns)))
             else:
-                log("Found cert {}, expires in {} days".format(", ".join(self.fqdns), expires_in.days))
+                log("Found cert {}, expires in {} days".format(", ".join(self.fqdns), expires_in_days))
         
-            if expires_in.days < expire_cutoff_days:
+            if expires_in_days < self.expire_cutoff_days:
                 log("Trying to renew cert {}".format(", ".join(self.fqdns)))
                 cmd = self.acme_renew_cmd()
                 (out, err, exitcode) = run(cmd, env=acme_env)
@@ -143,9 +172,13 @@ class SetupSSL(object):
                     log(err)
                     fail = True
             else:
-                log("Nothing to do for cert file {}".format(cert_file))
+                log("Nothing to do for cert file {}".format(self.cert_file))
         else :
-            log('cert_file {} not found'.format(cert_file))
+            if not cert_exists:
+                log('cert_file {} not found'.format(self.cert_file))
+            else:
+                log('cert_file {} does not match config'.format(self.cert_file))
+
             log('Requesting cert.... (this can take awhile)')
 
             if not os.path.isdir(cert_dir):
@@ -154,10 +187,14 @@ class SetupSSL(object):
             cmd = self.acme_issue_cmd()
             debug("ACME_ENV")
             debug(acme_env)
+            temp_dir = tempfile.TemporaryDirectory()
 
+            # issue cert in a temp dir
+            # move to definitive dir if successful
+            acme_env["CERT_PATH"] = temp_dir.name
+            
             (out, err, exitcode) = run(cmd, env=acme_env)
 
-                        
             if exitcode != 0:
                 log("Requesting cert for {}: FAILED".format(", ".join(self.fqdns)))
                 log(err)
@@ -166,7 +203,13 @@ class SetupSSL(object):
             else:
                 log("Requesting cert for {}: SUCCESS".format(", ".join(self.fqdns)))
                 change = True
-        
+                # move contents of temp dir to /ssl
+                for src_file in temp_dir.name.glob('*.*'):
+                    shutil.copy(src_file, "/ssl/")
+
+            temp_dir.cleanup()
+
+
         return (change, fail)
 
 
@@ -225,6 +268,9 @@ def main(fqdns, cert_path, email, port, challenge_dns_provider=None, expire_cuto
 
     # email required in both cases
     s.cert_email=email
+    s.cert_file = cert_path
+    s.expire_cutoff_days=expire_cutoff_days
+    s.fqdns = fqdns
 
     try:
         if not validate_email(email):
@@ -237,7 +283,7 @@ def main(fqdns, cert_path, email, port, challenge_dns_provider=None, expire_cuto
 
 
     log("")
-    (change, fail) = s.get_le_cert(cert_path, expire_cutoff_days=expire_cutoff_days)
+    (change, fail) = s.get_le_cert()
 
     if CERTFILE_UID != None:
         run("chown -R {} {}".format(CERTFILE_UID, os.path.dirname(cert_path)))
