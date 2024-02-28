@@ -217,6 +217,7 @@ class SetupSSL(object):
     def acme_cli(self):
         cmd = "acme.sh "
         cmd += " --home /etc/acme "    
+        cmd += " --force " # always force to avoid CA from bitching about not yet ripe certs    
         cmd += " --email {} ".format(self.cert_email)    
         cmd += " --server {} ".format(ACME_CA_SERVER)    
         return cmd
