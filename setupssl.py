@@ -226,12 +226,12 @@ class SetupSSLHttp(SetupSSL):
     acme_cert_http_port = 80
 
     def acme_renew_cmd(self):
-        cmd = "{} --renew --standalone --httpport {} -d {}".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
+        cmd = "{} --renew --standalone --force --httpport {} -d {}".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
         debug(cmd)
         return cmd
 
     def acme_issue_cmd(self):
-        cmd = "{} --issue --standalone --httpport {} -d {} ".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
+        cmd = "{} --issue --standalone --force --httpport {} -d {} ".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
         debug(cmd)
         return cmd
 
