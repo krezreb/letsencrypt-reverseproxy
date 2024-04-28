@@ -1,4 +1,4 @@
-limit_req_zone $binary_remote_addr zone=$LIMIT_ZONE:10m rate=5r/s;
+#limit_req_zone $binary_remote_addr zone=$LIMIT_ZONE:10m rate=5r/s;
 
 
 server {
@@ -6,7 +6,7 @@ server {
     listen 8080 ;
     server_name $SERVER_NAME;
 
-    limit_req zone=$LIMIT_ZONE burst=20;
+    #limit_req zone=$LIMIT_ZONE burst=20;
 
     client_body_buffer_size  10K;
     client_header_buffer_size 10k;

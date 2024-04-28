@@ -45,7 +45,7 @@ RUN apk update -f \
 
 ADD requirements.txt / 
 
-RUN pip3 install -r /requirements.txt
+RUN pip3 install -r /requirements.txt --break-system-packages
 
 
 # install acme bash implementation

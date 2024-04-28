@@ -197,6 +197,7 @@ class SetupSSL(object):
 
             if exitcode != 0:
                 log("Requesting cert for {}: FAILED".format(", ".join(self.fqdns)))
+                log(out)
                 log(err)
                 fail = True
     

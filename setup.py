@@ -73,7 +73,7 @@ def apply_template( template_path, invars, basic_auth_file=None):
         vars["AUTH_BASIC"] = ""
         vars["AUTH_BASIC_USER_FILE"] = ""
 
-    vars["LIMIT_ZONE"] = hashlib.sha224(vars['PROXY_PASS_TARGET'].encode('utf-8')).hexdigest()
+    #vars["LIMIT_ZONE"] = hashlib.sha224(vars['PROXY_PASS_TARGET'].encode('utf-8')).hexdigest()
     ks = list(vars.keys())
     ks.sort(key=len, reverse=True)
     for k in ks:
