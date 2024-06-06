@@ -149,6 +149,16 @@ if __name__ == '__main__':
 
             extra_options = []
 
+            if "allow_only" in conf:
+                v["ALLOW_ONLY"] = conf["allow_only"]
+
+            if "ALLOW_ONLY" in v:
+                for cidr in v["ALLOW_ONLY"]:
+                    extra_options.append("allow {};".format(cidr))
+
+                extra_options.append("deny all;")
+
+
             if "SKIP_PROXY_HEADERS" not in v:
                 extra_options.append("proxy_set_header X-Real-IP $remote_addr;")
                 extra_options.append("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;")
