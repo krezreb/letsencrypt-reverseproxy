@@ -107,25 +107,27 @@ class SetupSSL(object):
         cert_matches_conf = False
         expires_in_days = -1
 
-        if os.path.isfile(self.cert_file):
-            log('cert_file {} found'.format(self.cert_file))
-            cert_exists = True
-            # cert already exists
-            cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.cert_file).read())
-            exp = datetime.datetime.strptime(cert.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
-            
-            expires_in = exp - datetime.datetime.utcnow()
-      
-            cert = x509.load_pem_x509_certificate(open(cert_path, 'rb').read(), default_backend())
+        if not os.path.isfile(self.cert_file):
+            return False, cert_matches_conf, 0
 
-            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-            cert_sans = san.value.get_values_for_type(x509.DNSName)
+        log('cert_file {} found'.format(self.cert_file))
+        cert_exists = True
+        # cert already exists
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.cert_file).read())
+        exp = datetime.datetime.strptime(cert.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
+        
+        expires_in = exp - datetime.datetime.utcnow()
+    
+        cert = x509.load_pem_x509_certificate(open(cert_path, 'rb').read(), default_backend())
 
-            cert_matches_conf = True
-            for d in self.fqdns:
-                if d not in cert_sans:
-                    cert_matches_conf = False
-                    break
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        cert_sans = san.value.get_values_for_type(x509.DNSName)
+
+        cert_matches_conf = True
+        for d in self.fqdns:
+            if d not in cert_sans:
+                cert_matches_conf = False
+                break
 
         return cert_exists, cert_matches_conf, expires_in.days
 
@@ -217,7 +219,7 @@ class SetupSSL(object):
     @property
     def acme_cli(self):
         cmd = "acme.sh "
-        cmd += " --home /etc/acme "    
+        cmd += " --home /etc/acme --no-color"    
         cmd += " --force " # always force to avoid CA from bitching about not yet ripe certs    
         cmd += " --email {} ".format(self.cert_email)    
         cmd += " --server {} ".format(ACME_CA_SERVER)    
