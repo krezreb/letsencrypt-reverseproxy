@@ -27,6 +27,9 @@ ENV CONF_YML="/config.yml"
 ENV CONF_OUT_DIR=/etc/nginx/conf.d
 ENV PYTHONUNBUFFERED=1
 
+# default 444 page, if used
+ENV CERT_444_PATH='/ssl/default444/cert.pem'
+ENV CERT_444_KEY_PATH='/ssl/default444/privkey.pem'
 
 EXPOSE 8080 443
 

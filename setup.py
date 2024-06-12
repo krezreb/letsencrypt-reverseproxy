@@ -9,13 +9,13 @@ from cryptography.hazmat.backends import default_backend
 
 DEBUG = os.environ.get('DEBUG', None)
 
-
-
 # SSL cert stuff
 ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 8086))
 CERT_EMAIL = os.environ.get('CERT_EMAIL', None)
 CERT_FQDN = os.environ.get('CERT_FQDN', None)
 CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
+CERT_444_PATH = os.environ.get('CERT_444_PATH', '/ssl/default444/cert.pem')
+CERT_444_KEY_PATH = os.environ.get('CERT_444_KEY_PATH', '/ssl/default444/privkey.pem')
 CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
 CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
 CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
@@ -31,6 +31,7 @@ CONF_YML = os.environ.get('CONF_YML', None)
 
 TEMPLATE_FILE_NGINX = os.environ.get('TEMPLATE_FILE_NGINX', '/etc/nginx/nginx.conf.tpl')
 CONFIG_FILE_NGINX = os.environ.get('CONFIG_FILE_NGINX', '/etc/nginx/nginx.conf')
+TEMPLATE_FILE_444 = os.environ.get('TEMPLATE_FILE_444', '/etc/nginx/conf.d/nginx_default444.conf.tpl')
 TEMPLATE_FILE_HTTP = os.environ.get('TEMPLATE_FILE_HTTP', '/etc/nginx/conf.d/nginx_http.conf.tpl')
 TEMPLATE_FILE_HTTPS = os.environ.get('TEMPLATE_FILE_HTTPS', '/etc/nginx/conf.d/nginx_https.conf.tpl')
 CONF_OUT_DIR = os.environ.get('CONF_OUT_DIR', '/etc/nginx/conf.d/')
@@ -125,6 +126,19 @@ if __name__ == '__main__':
 
             san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
             cert_sans = san.value.get_values_for_type(x509.DNSName)
+
+        # by default return 444 to clients who do not specify a valid hostname
+        if "default_444" in conf:
+            log("setting up default 444")
+            vars = {
+                "CERT_PATH": CERT_444_PATH,
+                "CERT_KEY_PATH":CERT_444_KEY_PATH
+            }
+            applied_template = apply_template(TEMPLATE_FILE_444, vars)
+            template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, "default444")
+            log("saving nginx config to {}".format(template_path))
+            with open(template_path, "w") as fh:
+                fh.write(applied_template)
 
         for k,v in conf["conf"].items():
 

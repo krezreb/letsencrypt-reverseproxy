@@ -11,6 +11,10 @@ setup
 
 echo "Starting nginx..."
 
+# generate dummy self signed cert for 444 if needed
+mkdir -p $(dirname $CERT_444_PATH) || true
+openssl req -x509 -newkey rsa:4096 -keyout $CERT_444_KEY_PATH -out $CERT_444_PATH -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
+
 # fire up nginx
 nginx -g "daemon off;" &
 
