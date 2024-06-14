@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, yaml, time, sys
+import os, yaml, time, sys, re
 from subprocess import Popen, PIPE
 import hashlib
 import argparse
@@ -85,13 +85,13 @@ def apply_template( template_path, invars, basic_auth_file=None):
     return template
 
 
-def write_conf(path, data):
+def write_conf(file_path, data):
 
-    if os.path.exists(path):
+    if os.path.exists(file_path):
         d1 = hashlib.sha256()
         d2 = hashlib.sha256()
         d1.update(bytes(data, 'utf-8'))
-        with open(path, 'r') as fh:
+        with open(file_path, 'r') as fh:
             data2 = fh.read()
 
         d2.update(bytes(data2, 'utf-8'))
@@ -99,12 +99,23 @@ def write_conf(path, data):
         if d1.hexdigest() == d2.hexdigest():
             return False
             
-    with open(path, 'w'):   
+    with open(file_path, 'w') as fh:   
         fh.write(data)
         
     return True
 
+def dns_in_cert_sans(d, sans):
+    if d in sans:
+        return True
+    
+    for e in sans:
+        if "*" in e:
+            r = e.replace("*", "(.+)")
+            if re.match(r, d):
+                return True
 
+    return False
+    
 if __name__ == '__main__':
 
     # parser = argparse.ArgumentParser()
@@ -166,7 +177,7 @@ if __name__ == '__main__':
         for k,v in conf["conf"].items():
 
             vars = os.environ.copy()
-            log("handing {}".format(k))
+            log("handling {}".format(k))
             if "PROXY_PASS_TARGET" not in v:
                 log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
                 continue
@@ -215,11 +226,11 @@ if __name__ == '__main__':
                 changes = True
 
             debug(TEMPLATE_FILE_HTTP)
-            debug(applied_template)
+            #debug(applied_template)
 
             # domain not in cert
             # or cert does not exist
-            if k not in cert_sans:
+            if not dns_in_cert_sans(k, cert_sans):
                 continue
 
             # vars["CERT_PATH"] = cert_path
@@ -227,7 +238,7 @@ if __name__ == '__main__':
 
             applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, basic_auth_file)
             debug(TEMPLATE_FILE_HTTPS)
-            debug(applied_template)
+            #debug(applied_template)
 
             template_path = "{}/{}_https.conf".format(CONF_OUT_DIR, k)
             log("saving nginx config to {}".format(template_path))

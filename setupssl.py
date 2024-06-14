@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, yaml
+import os, yaml, re
 from subprocess import Popen, PIPE
 from OpenSSL import crypto
 from cryptography import x509
@@ -66,7 +66,53 @@ class SetupSSL(object):
         self.fqdns = fqdns
         self.my_hostname = my_hostname
         self.check_ip_url = check_ip_url
+        self.cert_sans = None
+    
+    @property
+    # list of sans to provide cert
+    # either hard coded in config["cert_sans"] if using wildcards
+    # OR self.fqdns
+    def get_cert_sans(self):
+        if self.cert_sans != None:
+            return self.cert_sans
+        return self.fqdns
+
+    # given a list of dns entries, some of which might contain wildcards
+    # remove any dns entries that are encompassed in a wildcard
+    # return entries
+    # @property
+    # def fqdns_wildcarded(self):
+    #     fqdns = []
+    #     wildcards = []
+
+    #     for e in self.fqdns.copy():
+    #         if "*" in e:
+    #             wildcards.append(e)
+    #         else:
+    #             fqdns.append(e)
+
+    #     if len(wildcards) == 0:
+    #         # no wildcards
+    #         return fqdns
         
+    #     entries = []
+
+    #     for f in fqdns:
+    #         covered = False
+    #         for wc in wildcards:
+    #             r = wc.replace("*", "(.+)")
+    #             if re.match(r, f):
+    #                 # fqdn is covered by a wildcard
+    #                 # don't append to entries
+    #                 covered = True
+    #         # not covered by a wildcard, append to entries
+    #         if not covered:
+    #             entries.append(f)
+
+    #     reduced = wildcards + entries
+    #     debug(reduced)
+    #     return  reduced
+
     def points_to_me(self, s):
         self.get_my_ip()
         
@@ -113,8 +159,8 @@ class SetupSSL(object):
         log('cert_file {} found'.format(self.cert_file))
         cert_exists = True
         # cert already exists
-        cert = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.cert_file).read())
-        exp = datetime.datetime.strptime(cert.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
+        cert1 = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.cert_file).read())
+        exp = datetime.datetime.strptime(cert1.get_notAfter().decode("utf-8"), '%Y%m%d%H%M%SZ')
         
         expires_in = exp - datetime.datetime.utcnow()
     
@@ -124,7 +170,7 @@ class SetupSSL(object):
         cert_sans = san.value.get_values_for_type(x509.DNSName)
 
         cert_matches_conf = True
-        for d in self.fqdns:
+        for d in self.cert_sans:
             if d not in cert_sans:
                 cert_matches_conf = False
                 break
@@ -155,21 +201,21 @@ class SetupSSL(object):
             log('cert_file {} matches config'.format(self.cert_file))
 
             if expires_in_days <= 0:
-                log("Found cert {} EXPIRED".format(", ".join(self.fqdns)))
+                log("Found cert {} EXPIRED".format(", ".join(self.get_cert_sans)))
             else:
-                log("Found cert {}, expires in {} days".format(", ".join(self.fqdns), expires_in_days))
+                log("Found cert {}, expires in {} days".format(", ".join(self.get_cert_sans), expires_in_days))
         
             if expires_in_days < self.expire_cutoff_days:
-                log("Trying to renew cert {}".format(", ".join(self.fqdns)))
+                log("Trying to renew cert {}".format(", ".join(self.get_cert_sans)))
                 cmd = self.acme_renew_cmd()
                 (out, err, exitcode) = run(cmd, env=acme_env)
                 
                 if exitcode == 0:
-                    log("RENEW SUCCESS: Certificate {} successfully renewed".format(", ".join(self.fqdns)))
+                    log("RENEW SUCCESS: Certificate {} successfully renewed".format(", ".join(self.get_cert_sans)))
                     change = True
         
                 else:
-                    log("RENEW FAIL: ERROR renewing certificate {}".format(", ".join(self.fqdns)))
+                    log("RENEW FAIL: ERROR renewing certificate {}".format(", ".join(self.get_cert_sans)))
                     log(out)
                     log(err)
                     fail = True
@@ -187,8 +233,8 @@ class SetupSSL(object):
                 os.makedirs(cert_dir)
                 
             cmd = self.acme_issue_cmd()
-            debug("ACME_ENV")
-            debug(acme_env)
+            #debug("ACME_ENV")
+            #debug(acme_env)
             temp_dir = tempfile.TemporaryDirectory()
 
             # issue cert in a temp dir
@@ -198,13 +244,13 @@ class SetupSSL(object):
             (out, err, exitcode) = run(cmd, env=acme_env)
 
             if exitcode != 0:
-                log("Requesting cert for {}: FAILED".format(", ".join(self.fqdns)))
+                log("Requesting cert for {}: FAILED".format(", ".join(self.get_cert_sans)))
                 log(out)
                 log(err)
                 fail = True
     
             else:
-                log("Requesting cert for {}: SUCCESS".format(", ".join(self.fqdns)))
+                log("Requesting cert for {}: SUCCESS".format(", ".join(self.get_cert_sans)))
                 change = True
                 # move contents of temp dir to /ssl
                 for src_file in temp_dir.name.glob('*.*'):
@@ -230,12 +276,12 @@ class SetupSSLHttp(SetupSSL):
     acme_cert_http_port = 80
 
     def acme_renew_cmd(self):
-        cmd = "{} --renew --standalone --httpport {} -d {}".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
+        cmd = "{} --renew --standalone --httpport {} -d '{}'".format(self.acme_cli, self.acme_cert_http_port, "' -d '".join(self.get_cert_sans))
         debug(cmd)
         return cmd
 
     def acme_issue_cmd(self):
-        cmd = "{} --issue --standalone --httpport {} -d {} ".format(self.acme_cli, self.acme_cert_http_port, " -d ".join(self.fqdns))
+        cmd = "{} --issue --standalone --httpport {} -d '{}' ".format(self.acme_cli, self.acme_cert_http_port, "' -d '".join(self.get_cert_sans))
         debug(cmd)
         return cmd
 
@@ -243,22 +289,40 @@ class SetupSSLDns(SetupSSL):
     challenge_dns_provider=""
 
     def acme_renew_cmd(self):
-        cmd = "{} --renew --dns {} -d {}".format(self.acme_cli, self.challenge_dns_provider, " -d ".join(self.fqdns))
+        cmd = "{} --renew --dns {} -d '{}'".format(self.acme_cli, self.challenge_dns_provider, "' -d '".join(self.get_cert_sans))
         return cmd
 
     def acme_issue_cmd(self):
-        cmd = "{} --issue --dns {} -d {} --email {}".format(self.acme_cli, self.challenge_dns_provider, " -d ".join(self.fqdns), self.cert_email)
+        cmd = "{} --issue --dns {} -d '{}'".format(self.acme_cli, self.challenge_dns_provider, "' -d '".join(self.get_cert_sans))
         return cmd
 
+
+class SetupSSLRoute53(SetupSSL):
+    challenge_dns_provider="dns_aws"
+
+    def acme_renew_cmd(self):
+        cmd = "{} --renew --dns {} -d '{}'".format(self.acme_cli, self.challenge_dns_provider, "' -d '".join(self.get_cert_sans))
+        return cmd
+
+    def acme_issue_cmd(self):
+        cmd = "{} --issue --dns {} -d '{}' --ocsp-must-staple --keylength 4096 ".format(self.acme_cli, self.challenge_dns_provider, "' -d '".join(self.get_cert_sans))
+        return cmd
+    
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=ACME_CERT_PORT, help='What port to use to issue certs')
 parser.add_argument('--email', default=CERT_EMAIL, help='What email to use to issue certs')
 parser.add_argument('--challenge-dns-provider', default=CHALLENGE_DNS_PROVIDER)
 args = parser.parse_args()
 
-def main(fqdns, cert_path, email, port, challenge_dns_provider=None, expire_cutoff_days=30):
+def main(fqdns, cert_path, email, port, challenge_dns_provider=None, expire_cutoff_days=30, cert_sans=None):
 
-    if challenge_dns_provider != None:
+    if challenge_dns_provider == "dns_aws":
+        # use Route53 challenge
+        s = SetupSSLRoute53(fqdns=fqdns)
+        s.challenge_dns_provider = challenge_dns_provider
+        log('Using DNS certificate generation with {}'.format(challenge_dns_provider))
+
+    elif challenge_dns_provider != None:
         # use dns challenge
         s = SetupSSLDns(fqdns=fqdns)
         s.challenge_dns_provider = challenge_dns_provider
@@ -285,8 +349,10 @@ def main(fqdns, cert_path, email, port, challenge_dns_provider=None, expire_cuto
     if len(fqdns) == 0:
         raise SetupSSLException("ERROR: no certificate fqdn(s) set")
 
-
     log("")
+    if cert_sans != None:
+        s.cert_sans = cert_sans
+
     (change, fail) = s.get_le_cert()
 
     if CERTFILE_UID != None:
@@ -305,10 +371,11 @@ if __name__ == '__main__':
             conf = yaml.load(f, Loader=yaml.FullLoader)
         
         fqdns = []
+
         s = SetupSSL()
 
         for cert_fqdn,v in conf["conf"].items():
-            log("handing {}".format(cert_fqdn))
+            log("handling {}".format(cert_fqdn))
 
             vars = os.environ.copy()
             if "PROXY_PASS_TARGET" not in v:
@@ -327,6 +394,10 @@ if __name__ == '__main__':
 
         else:
 
+            cert_sans = []
+            if "cert_sans" in conf:
+                cert_sans = conf["cert_sans"]
+
             cert_path = '/ssl/cert.pem'
 
             if not os.path.isdir(os.path.dirname(cert_path)):
@@ -339,7 +410,7 @@ if __name__ == '__main__':
                 challenge_dns_provider = v["CHALLENGE_DNS_PROVIDER"]
 
             try:
-                main(fqdns, cert_path, email, args.port, challenge_dns_provider, CERT_EXPIRE_CUTOFF_DAYS)
+                main(fqdns, cert_path, email, args.port, challenge_dns_provider, CERT_EXPIRE_CUTOFF_DAYS, cert_sans)
             except SetupSSLException:
                 raise
             

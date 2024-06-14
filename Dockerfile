@@ -10,7 +10,7 @@ ENV DOMAIN_SSL_CONF=/ssl/domain.csr.conf
 ENV CSR_PATH=/ssl/csr.csr
 ENV CERT_KEY_PATH=/ssl/privkey.pem
 ENV CERT_PATH=/ssl/cert.pem
-
+ENV TERM=xterm
 ENV LE_CONFIG_HOME=/etc/acme
 #ENV ACME_CERT_PORT=8086
 ENV SETUP_REFRESH_FREQUENCY=86400
@@ -53,7 +53,7 @@ RUN pip3 install -r /requirements.txt --break-system-packages
 
 # install acme bash implementation
 
-ENV ACME_RELEASE=3.0.7
+ENV ACME_RELEASE=master
 
 RUN mkdir -p /etc/acme \
     && cd /root \
@@ -66,6 +66,8 @@ RUN mkdir -p /etc/acme \
 
 
 ADD *.py /usr/local/bin/
+RUN python3 -m compileall /usr/local/bin/
+
 RUN ln -s /usr/local/bin/setupssl.py  /usr/local/bin/setupssl
 RUN ln -s /usr/local/bin/setup.py  /usr/local/bin/setup
 ADD run.sh /run.sh
