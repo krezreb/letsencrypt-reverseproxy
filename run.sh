@@ -22,9 +22,9 @@ if [[ ${PROXY_PASS_TARGET:=""} != "" ]] ;  then
 
     if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
         #echo ACME_CERT_PORT is $ACME_CERT_PORT
-        setupssl && setup && nginx -s reload
+        setupssl && setup
         # regularly check if ssl cert needs to be renewed
-        (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl; setup; nginx -s reload ;  done) &
+        (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl; setup ;  done) &
     else
         # set SETUP_REFRESH_FREQUENCY to zero if another container does the renewing
         (while true ; do sleep 86000 ; nginx -s reload ;  done) &

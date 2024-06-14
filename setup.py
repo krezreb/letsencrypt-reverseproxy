@@ -85,6 +85,26 @@ def apply_template( template_path, invars, basic_auth_file=None):
     return template
 
 
+def write_conf(path, data):
+
+    if os.path.exists(path):
+        d1 = hashlib.sha256()
+        d2 = hashlib.sha256()
+        d1.update(bytes(data, 'utf-8'))
+        with open(path, 'r') as fh:
+            data2 = fh.read()
+
+        d2.update(bytes(data2, 'utf-8'))
+
+        if d1.hexdigest() == d2.hexdigest():
+            return False
+            
+    with open(path, 'w'):   
+        fh.write(data)
+        
+    return True
+
+
 if __name__ == '__main__':
 
     # parser = argparse.ArgumentParser()
@@ -92,6 +112,8 @@ if __name__ == '__main__':
     # parser.add_argument('--http-only', action='store_true', help='What port to use to issue certs')
     # args = parser.parse_args()
     
+    changes = False
+
     if CONF_YML != None and os.path.exists(CONF_YML):
         log("reading {}".format(CONF_YML))
         with open(CONF_YML) as f:
@@ -108,8 +130,8 @@ if __name__ == '__main__':
 
         applied_template = apply_template(TEMPLATE_FILE_NGINX, vars)
 
-        with open(CONFIG_FILE_NGINX, "w") as fh:
-            fh.write(applied_template)
+        if write_conf(CONFIG_FILE_NGINX, applied_template):
+            changes = True
 
         # fqdns = []
 
@@ -137,8 +159,9 @@ if __name__ == '__main__':
             applied_template = apply_template(TEMPLATE_FILE_444, vars)
             template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, "default444")
             log("saving nginx config to {}".format(template_path))
-            with open(template_path, "w") as fh:
-                fh.write(applied_template)
+            if write_conf(template_path, applied_template):
+                changes = True
+
 
         for k,v in conf["conf"].items():
 
@@ -188,8 +211,8 @@ if __name__ == '__main__':
 
             template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, k)
             log("saving nginx config to {}".format(template_path))
-            with open(template_path, "w") as fh:
-                fh.write(applied_template)
+            if write_conf(template_path, applied_template):
+                changes = True
 
             debug(TEMPLATE_FILE_HTTP)
             debug(applied_template)
@@ -208,8 +231,8 @@ if __name__ == '__main__':
 
             template_path = "{}/{}_https.conf".format(CONF_OUT_DIR, k)
             log("saving nginx config to {}".format(template_path))
-            with open(template_path, "w") as fh:
-                fh.write(applied_template)
+            if write_conf(template_path, applied_template):
+                changes = True            
 
 
     elif PROXY_PASS_TARGET == None:
@@ -230,6 +253,7 @@ if __name__ == '__main__':
 
         applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, AUTH_BASIC_USER_FILE)
 
+        changes = True
         with open("{}/reverse_proxy_http.conf".format(CONF_OUT_DIR), "w") as fh:
             fh.write(applied_template)
 
@@ -238,3 +262,5 @@ if __name__ == '__main__':
             with open("{}/reverse_proxy_https.conf".format(CONF_OUT_DIR), "w") as fh:
                 fh.write(applied_template)
 
+    if changes:
+        os.system("nginx -s reload")
