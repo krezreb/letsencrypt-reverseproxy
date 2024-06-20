@@ -33,6 +33,11 @@ http {
 
     keepalive_timeout  75 20;
 
+    map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+    }
+
     include /etc/nginx/conf.d/*.conf;
 
 }
