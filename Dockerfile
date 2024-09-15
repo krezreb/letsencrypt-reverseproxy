@@ -3,7 +3,7 @@ FROM nginx:mainline-alpine
 RUN mkdir -p /ssl
 
 # acme.sh conf options
-ENV AUTO_UPGRADE 0
+ENV AUTO_UPGRADE=0
 ENV DOMAIN_PATH=/ssl
 ENV DOMAIN_CONF=/ssl/domain.conf
 ENV DOMAIN_SSL_CONF=/ssl/domain.csr.conf
@@ -53,7 +53,7 @@ RUN pip3 install -r /requirements.txt --break-system-packages
 
 # install acme bash implementation
 
-ENV ACME_RELEASE=master
+ENV ACME_RELEASE=3.0.7
 
 RUN mkdir -p /etc/acme \
     && cd /root \

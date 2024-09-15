@@ -235,8 +235,6 @@ if __name__ == '__main__':
             if not dns_in_cert_sans(k, cert_sans):
                 continue
 
-            vars["UPSTREAM"] = ""
-
             websockets = (
                 'proxy_redirect off;',
                 'proxy_http_version 1.1;',
