@@ -7,24 +7,12 @@ import argparse
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-DEBUG = os.environ.get('DEBUG', None)
+DEBUG = os.environ.get('DEBUG', "0")
 
 # SSL cert stuff
-ACME_CERT_PORT = int(os.environ.get('ACME_CERT_PORT', 8086))
-CERT_EMAIL = os.environ.get('CERT_EMAIL', None)
-CERT_FQDN = os.environ.get('CERT_FQDN', None)
-CERT_PATH = os.environ.get('CERT_PATH', '/ssl/cert.pem')
 CERT_444_PATH = os.environ.get('CERT_444_PATH', '/ssl/default444/cert.pem')
 CERT_444_KEY_PATH = os.environ.get('CERT_444_KEY_PATH', '/ssl/default444/privkey.pem')
-CERT_EXPIRE_CUTOFF_DAYS = int(os.environ.get('CERT_EXPIRE_CUTOFF_DAYS', 31))
-CERTFILE_UID = os.environ.get('CERTFILE_UID', None)
-CERTFILE_GID = os.environ.get('CERTFILE_GID', None)
-CHALLENGE_DNS_PROVIDER = os.environ.get('CHALLENGE_DNS_PROVIDER', None)
-
-# proxy pass single target  vars
-PROXY_PASS_TARGET = os.environ.get('PROXY_PASS_TARGET', None)
 SETUP_REFRESH_FREQUENCY = os.environ.get('SETUP_REFRESH_FREQUENCY', None)
-AUTH_BASIC_USER_FILE = os.environ.get('AUTH_BASIC_USER_FILE', None)
 
 # multiple target conf
 CONF_YML = os.environ.get('CONF_YML', None)
@@ -36,21 +24,30 @@ TEMPLATE_FILE_HTTP = os.environ.get('TEMPLATE_FILE_HTTP', '/etc/nginx/conf.d/ngi
 TEMPLATE_FILE_HTTPS = os.environ.get('TEMPLATE_FILE_HTTPS', '/etc/nginx/conf.d/nginx_https.conf.tpl')
 CONF_OUT_DIR = os.environ.get('CONF_OUT_DIR', '/etc/nginx/conf.d/')
 
-def run(cmd, env=os.environ.copy()):
+def run(cmd, splitlines=False, env=os.environ.copy()):
     # you had better escape cmd cause it's goin to the shell as is
-    proc = Popen(cmd, stdout=sys.stdout, stderr=sys.stderr, shell=True, env=env)
-    proc.communicate()
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True, env=env)
+    out, err = proc.communicate()
+    if splitlines:
+        out_split = []
+        for line in out.split("\n"):
+            line = line.strip()
+            if line != '':
+                out_split.append(line)
+        out = out_split
 
     exitcode = int(proc.returncode)
 
-    return exitcode
+    return (out, err, exitcode)
 
 def log(s):
     print("SETUP: {}".format(s))
 
-
 def debug(s):
-    if DEBUG != None:
+    pass
+
+if DEBUG[0].lower() in ("t", '1'):
+    def debug(s):
         print("SETUP DEBUG: {}".format(s))
 
 def apply_template( template_path, invars, basic_auth_file=None):
@@ -84,7 +81,41 @@ def apply_template( template_path, invars, basic_auth_file=None):
 
     return template
 
+def certbot_certificates(lines):
+    search = ["Certificate Name", "Domains", "Certificate Path", "Private Key Path"]
+    key = search[0]
 
+    certbot_certs = {}
+    k = None
+    for line in lines:
+        line = line.strip()
+        for s in search:
+            if line.startswith("{}: ".format(s)):
+                val = line.split("{}: ".format(s))[1].strip()
+                if s == key:
+                    k = val
+                    certbot_certs[k] = {}
+                else:
+                    certbot_certs[k][s] = val
+
+    return certbot_certs
+
+def get_cert_path_for_domain(d, certbot_certs):
+    debug("get_cert_path_for_domain {}".format(d))
+    for k,v in certbot_certs.items():
+        cert_domains = v["Domains"].split(" ")
+        match = False
+        for dom in cert_domains:
+            if dom == d:
+                match = True
+            elif dom[0] == "*" and d.endswith(dom[1:]):
+                match = True
+
+            if match:
+                return v["Certificate Path"], v["Private Key Path"]
+
+    return None, None
+    
 if __name__ == '__main__':
 
     # parser = argparse.ArgumentParser()
@@ -93,6 +124,7 @@ if __name__ == '__main__':
     # args = parser.parse_args()
     
     if CONF_YML != None and os.path.exists(CONF_YML):
+       
         log("reading {}".format(CONF_YML))
         with open(CONF_YML) as f:
             conf = yaml.load(f, Loader=yaml.FullLoader)
@@ -111,22 +143,6 @@ if __name__ == '__main__':
         with open(CONFIG_FILE_NGINX, "w") as fh:
             fh.write(applied_template)
 
-        # fqdns = []
-
-        # for k,v in conf["conf"].items():
-        #     fqdns.append(k)
-
-        cert_path = '/ssl/fullchain.cer'
-
-        # no cert, yet
-        cert_sans = []
-        
-        if os.path.isfile(cert_path):
-            cert = x509.load_pem_x509_certificate(open(cert_path, 'rb').read(), default_backend())
-
-            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-            cert_sans = san.value.get_values_for_type(x509.DNSName)
-
         # by default return 444 to clients who do not specify a valid hostname
         if "default_444" in conf:
             log("setting up default 444")
@@ -139,6 +155,12 @@ if __name__ == '__main__':
             log("saving nginx config to {}".format(template_path))
             with open(template_path, "w") as fh:
                 fh.write(applied_template)
+
+        # grab list of certs from certbot
+        (out, err, exitcode) = run("certbot certificates", splitlines=True)
+        if exitcode != 0:
+            raise Exception(err)
+        certbot_certs = certbot_certificates(out)
 
         for k,v in conf["conf"].items():
 
@@ -182,7 +204,7 @@ if __name__ == '__main__':
                 if i == i.lower():
                     extra_options.append('{} "{}";'.format(i, val))
 
-            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)
+            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)          
 
             applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, basic_auth_file)
 
@@ -194,13 +216,15 @@ if __name__ == '__main__':
             debug(TEMPLATE_FILE_HTTP)
             debug(applied_template)
 
+            cert_file, privkey = get_cert_path_for_domain(k, certbot_certs)
+
             # domain not in cert
             # or cert does not exist
-            if k not in cert_sans:
+            if cert_file == None:
                 continue
 
-            # vars["CERT_PATH"] = cert_path
-            # vars["CERT_KEY_PATH"] = '/ssl/privkey.pem'
+            vars["CERT_PATH"] = cert_file
+            vars["CERT_KEY_PATH"] = privkey
 
             applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, basic_auth_file)
             debug(TEMPLATE_FILE_HTTPS)
@@ -211,10 +235,8 @@ if __name__ == '__main__':
             with open(template_path, "w") as fh:
                 fh.write(applied_template)
 
-
-    elif PROXY_PASS_TARGET == None:
+    else:
         # in this case there is no nginx, this container only handles cert generating
-        log("ACME_CERT_PORT is {}".format(ACME_CERT_PORT))
 
         run("setupssl")
         # regularly check if ssl cert needs to be renewed
@@ -222,19 +244,4 @@ if __name__ == '__main__':
             time.sleep(86000)
             run("setupssl")
 
-    else:
-        log("PROXY_PASS_TARGET is {}".format(PROXY_PASS_TARGET))
-
-        vars = os.environ.copy()
-        vars["DEFAULT_SERVER"] =  "default_server"
-
-        applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, AUTH_BASIC_USER_FILE)
-
-        with open("{}/reverse_proxy_http.conf".format(CONF_OUT_DIR), "w") as fh:
-            fh.write(applied_template)
-
-            applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, AUTH_BASIC_USER_FILE)
-
-            with open("{}/reverse_proxy_https.conf".format(CONF_OUT_DIR), "w") as fh:
-                fh.write(applied_template)
 

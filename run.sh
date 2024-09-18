@@ -18,17 +18,13 @@ openssl req -x509 -newkey rsa:4096 -keyout $CERT_444_KEY_PATH -out $CERT_444_PAT
 # fire up nginx
 nginx -g "daemon off;" &
 
-if [[ ${PROXY_PASS_TARGET:=""} != "" ]] ;  then
-
-    if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
-        #echo ACME_CERT_PORT is $ACME_CERT_PORT
-        setupssl && setup && nginx -s reload
-        # regularly check if ssl cert needs to be renewed
-        (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl; setup; nginx -s reload ;  done) &
-    else
-        # set SETUP_REFRESH_FREQUENCY to zero if another container does the renewing
-        (while true ; do sleep 86000 ; nginx -s reload ;  done) &
-    fi
+if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
+    setupssl && setup && nginx -s reload
+    # regularly check if ssl cert needs to be renewed
+    (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl; setup; nginx -s reload ;  done) &
+else
+    # set SETUP_REFRESH_FREQUENCY to zero if another container does the renewing
+    (while true ; do sleep 86000 ; nginx -s reload ;  done) &
 fi
 
 wait
