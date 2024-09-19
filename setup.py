@@ -165,7 +165,7 @@ if __name__ == '__main__':
         for k,v in conf["conf"].items():
 
             vars = os.environ.copy()
-            log("handing {}".format(k))
+            log("handling {}".format(k))
             if "PROXY_PASS_TARGET" not in v:
                 log("no PROXY_PASS_TARGET provided for {}, skipping".format(k))
                 continue
@@ -200,11 +200,13 @@ if __name__ == '__main__':
                 extra_options.append("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;")
                 extra_options.append("proxy_set_header Host $http_host;")
 
-            for i,val in v.items():
-                if i == i.lower():
-                    extra_options.append('{} "{}";'.format(i, val))
+            if "EXTRA_OPTIONS" in v:
+                for x in v["EXTRA_OPTIONS"]:
+                    if x[-1] != ";":
+                        x += ";"
+                    extra_options.append(x)
 
-            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)          
+            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)
 
             applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, basic_auth_file)
 
@@ -225,6 +227,19 @@ if __name__ == '__main__':
 
             vars["CERT_PATH"] = cert_file
             vars["CERT_KEY_PATH"] = privkey
+            websockets = (
+                'proxy_redirect off;',
+                'proxy_http_version 1.1;',
+                'proxy_set_header Upgrade $http_upgrade;',
+                'proxy_set_header Connection $connection_upgrade;'
+            )
+            vars["WEBSOCKETS"] = "\n".join(websockets)
+
+            if "DISABLE_WEBSOCKETS" in v:
+                vars["WEBSOCKETS"] = ""
+
+            # vars["CERT_PATH"] = cert_path
+            # vars["CERT_KEY_PATH"] = '/ssl/privkey.pem'
 
             applied_template = apply_template(TEMPLATE_FILE_HTTPS, vars, basic_auth_file)
             debug(TEMPLATE_FILE_HTTPS)
