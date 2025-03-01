@@ -3,7 +3,7 @@
 
 server {
 
-    listen 8080 ;
+    listen $LISTEN ;
     server_name $SERVER_NAME;
 
     #limit_req zone=$LIMIT_ZONE burst=20;

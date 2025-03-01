@@ -2,7 +2,7 @@ limit_req_zone $binary_remote_addr zone=DEFAULT_444:10m rate=1r/s;
 
 server {
 
-    listen 8080 default_server;
+    listen $LISTEN default_server;
     server_name "";
 
     limit_req zone=DEFAULT_444 burst=2;
@@ -16,7 +16,7 @@ server {
 
     limit_req zone=DEFAULT_444 burst=2;
 
-    listen 443 ssl default_server;
+    listen $LISTEN_SSL ssl default_server;
 
     server_name "";
 

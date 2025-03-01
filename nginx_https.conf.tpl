@@ -1,7 +1,6 @@
 server {
     
-    listen 443 ssl $DEFAULT_SERVER;
-    #listen [::]:443 ssl http2 $DEFAULT_SERVER;
+    listen $LISTEN_SSL ssl $DEFAULT_SERVER;
     http2  on;
 
     server_name $SERVER_NAME;

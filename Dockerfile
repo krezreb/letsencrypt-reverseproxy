@@ -4,6 +4,8 @@ RUN mkdir -p /ssl
 
 ENV SETUP_REFRESH_FREQUENCY=86400
 ENV FRONT_HTTPS_PORT=443
+ENV LISTEN=8080
+ENV LISTEN_SSL=443
 
 # reverse proxy config
 ENV CONF_YML="/config.yml"

@@ -146,10 +146,11 @@ if __name__ == '__main__':
         # by default return 444 to clients who do not specify a valid hostname
         if "default_444" in conf:
             log("setting up default 444")
-            vars = {
-                "CERT_PATH": CERT_444_PATH,
-                "CERT_KEY_PATH":CERT_444_KEY_PATH
-            }
+            vars = os.environ.copy()
+
+            vars["CERT_PATH"] = CERT_444_PATH
+            vars["CERT_KEY_PATH"] = CERT_444_KEY_PATH
+            
             applied_template = apply_template(TEMPLATE_FILE_444, vars)
             template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, "default444")
             log("saving nginx config to {}".format(template_path))
