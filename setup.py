@@ -76,7 +76,7 @@ def apply_template( template_path, invars, basic_auth_file=None):
     ks.sort(key=len, reverse=True)
     for k in ks:
         template = template.replace("${}".format(k), vars[k])
-    
+
     debug(vars)
 
     return template
@@ -115,16 +115,16 @@ def get_cert_path_for_domain(d, certbot_certs):
                 return v["Certificate Path"], v["Private Key Path"]
 
     return None, None
-    
+
 if __name__ == '__main__':
 
     # parser = argparse.ArgumentParser()
     # parser.add_argument('--http-only', action='store_true', help='What port to use to issue certs')
     # parser.add_argument('--http-only', action='store_true', help='What port to use to issue certs')
     # args = parser.parse_args()
-    
+
     if CONF_YML != None and os.path.exists(CONF_YML):
-       
+
         log("reading {}".format(CONF_YML))
         with open(CONF_YML) as f:
             conf = yaml.load(f, Loader=yaml.FullLoader)
@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
             vars["CERT_PATH"] = CERT_444_PATH
             vars["CERT_KEY_PATH"] = CERT_444_KEY_PATH
-            
+
             applied_template = apply_template(TEMPLATE_FILE_444, vars)
             template_path = "{}/{}_http.conf".format(CONF_OUT_DIR, "default444")
             log("saving nginx config to {}".format(template_path))
@@ -172,7 +172,7 @@ if __name__ == '__main__':
                 continue
 
             vars["PROXY_PASS_TARGET"] = v["PROXY_PASS_TARGET"]
-            
+
             vars["DEFAULT_SERVER"] =  ""
 
             if "IS_DEFAULT" in v:
@@ -189,12 +189,17 @@ if __name__ == '__main__':
             if "allow_only" in conf:
                 v["ALLOW_ONLY"] = conf["allow_only"]
 
+            if "LISTEN" in v:
+                vars["LISTEN"] = v["LISTEN"]
+
+            if "LISTEN_SSL" in v:
+                vars["LISTEN_SSL"] = v["LISTEN_SSL"]
+
             if "ALLOW_ONLY" in v:
                 for cidr in v["ALLOW_ONLY"]:
                     extra_options.append("allow {};".format(cidr))
 
                 extra_options.append("deny all;")
-
 
             if "SKIP_PROXY_HEADERS" not in v:
                 extra_options.append("proxy_set_header X-Real-IP $remote_addr;")
@@ -259,5 +264,3 @@ if __name__ == '__main__':
         while True:
             time.sleep(86000)
             run("setupssl")
-
-
