@@ -6,6 +6,9 @@ ENV SETUP_REFRESH_FREQUENCY=86400
 ENV FRONT_HTTPS_PORT=443
 ENV LISTEN=8080
 ENV LISTEN_SSL=443
+ENV WORKER_PROCESSES=auto
+ENV WORKER_CONNECTIONS=2048
+
 
 # reverse proxy config
 ENV CONF_YML="/config.yml"
@@ -27,9 +30,9 @@ RUN apk update -f \
   socat \
   bash \
   tzdata \
-  && rm -rf /var/cache/apk/* 
+  && rm -rf /var/cache/apk/*
 
-ADD requirements.txt / 
+ADD requirements.txt /
 
 RUN pip3 install -r /requirements.txt --break-system-packages
 
@@ -40,7 +43,7 @@ RUN ln -s /usr/local/bin/setup.py  /usr/local/bin/setup
 ADD run.sh /run.sh
 RUN chmod +x /usr/local/bin/setup*.py /run.sh
 
-RUN rm -rf /etc/nginx/conf.d/* 
+RUN rm -rf /etc/nginx/conf.d/*
 
 ADD nginx.conf.tpl /etc/nginx/
 ADD nginx_*.conf.tpl /etc/nginx/conf.d/
