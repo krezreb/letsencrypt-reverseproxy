@@ -185,6 +185,11 @@ if __name__ == '__main__':
                 basic_auth_file = v["AUTH_BASIC_USER_FILE"]
 
             extra_options = []
+            if "EXTRA_OPTIONS" in conf:
+                for x in conf["EXTRA_OPTIONS"]:
+                    if x[-1] != ";":
+                        x += ";"
+                    extra_options.append(x)
 
             if "allow_only" in conf:
                 v["ALLOW_ONLY"] = conf["allow_only"]
@@ -212,7 +217,7 @@ if __name__ == '__main__':
                         x += ";"
                     extra_options.append(x)
 
-            vars["EXTRA_OPTIONS"] = "\n".join(extra_options)
+            vars["EXTRA_OPTIONS"] = "\n".join(list(set(extra_options)))
 
             applied_template = apply_template(TEMPLATE_FILE_HTTP, vars, basic_auth_file)
 
