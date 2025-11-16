@@ -1,5 +1,5 @@
 server {
-    
+
     listen $LISTEN_SSL ssl $DEFAULT_SERVER;
     http2  on;
 
@@ -13,25 +13,18 @@ server {
     gzip_min_length  1000;
     gzip_proxied     expired no-cache no-store private auth;
     gzip_types       text/plain application/x-javascript text/xml text/css application/xml;
-    
+
     client_body_buffer_size  32K;
     client_header_buffer_size 10k;
     client_max_body_size 10k;
-    
+
     location / {
         $AUTH_BASIC
         $AUTH_BASIC_USER_FILE
-
         client_max_body_size 0;
-
-        proxy_pass $PROXY_PASS_TARGET;
-
         $EXTRA_OPTIONS
-        #proxy_ssl $PROXY_SSL;
-        #proxy_ssl_trusted_certificate $PROXY_SSL_TRUSTED_CERTIFICATE;
-        #proxy_ssl_verify $PROXY_SSL_VERIFY;
-
+        $PROXY_PASS
         $WEBSOCKETS
-
     }
+
 }

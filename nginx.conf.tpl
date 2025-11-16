@@ -1,11 +1,14 @@
-user  nginx;
+user  $NGINX_USER;
 worker_processes $WORKER_PROCESSES;
+
+$TOPLEVEL_INCLUDES
 
 error_log  /dev/stdout warn;
 pid        /var/run/nginx.pid;
 
 events {
     worker_connections  $WORKER_CONNECTIONS;
+    worker_aio_requests $WORKER_AIO_REQUESTS;
 }
 
 pcre_jit on;
