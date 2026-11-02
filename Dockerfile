@@ -1,4 +1,4 @@
-FROM ubuntu:questing
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -26,7 +26,7 @@ ENV CERT_444_KEY_PATH='/ssl/default444/privkey.pem'
 EXPOSE 8080 443
 
 RUN apt update -y \
-    && apt install -y --no-install-recommends bash openssl certbot socat libnginx-mod-http-dav-ext nginx-extras nginx gettext python3 python3-pip tzdata \
+    && apt install -y --no-install-recommends bash openssl certbot socat libnginx-mod-http-dav-ext nginx-extras nginx gettext python3 python3-yaml python3-certbot-dns-route53 tzdata \
     && rm -rf /var/cache/apt/*
 
 # RUN apk update -f \
@@ -40,10 +40,6 @@ RUN apt update -y \
 #     tzdata \
 #     nginx-mod-http-dav-ext nginx-full nginx \
 #     && rm -rf /var/cache/apk/*
-
-ADD requirements.txt /
-
-RUN pip3 install -r /requirements.txt --break-system-packages
 
 ADD *.py /usr/local/bin/
 RUN ln -s /usr/local/bin/setupssl.py  /usr/local/bin/setupssl
