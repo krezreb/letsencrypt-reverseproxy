@@ -41,6 +41,13 @@ openssl req -x509 -newkey rsa:4096 -keyout $CERT_444_KEY_PATH -out $CERT_444_PAT
 
 # fire up nginx
 nginx -g "daemon off;" &
+NGINX_PID=$!
+
+# wait for master to write pid file, else later `nginx -s reload` fails
+while [ ! -s /var/run/nginx.pid ] ; do
+    kill -0 $NGINX_PID 2>/dev/null || { echo "nginx failed to start" ; exit 1 ; }
+    sleep 0.2
+done
 
 if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
     setupssl && setup && nginx -s reload
