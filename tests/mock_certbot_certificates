@@ -1,0 +1,13 @@
+Found the following certs:
+  Certificate Name: jumidev.com
+    Key Type: ECDSA
+    Domains: *.jumidev.com
+    Expiry Date: 2024-12-17 11:59:15+00:00 (VALID: 89 days)
+    Certificate Path: /etc/letsencrypt/live/jumidev.com/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/jumidev.com/privkey.pem
+  Certificate Name: jumidev.fr
+    Key Type: ECDSA
+    Domains: *.jumidev.fr 
+    Expiry Date: 2024-12-17 11:57:57+00:00 (VALID: 89 days)
+    Certificate Path: /etc/letsencrypt/live/jumidev.fr/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/jumidev.fr/privkey.pem

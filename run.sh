@@ -5,61 +5,57 @@ trap "kill -9 0" EXIT
 
 set -ue
 
-echo SETUP_REFRESH_FREQUENCY is $SETUP_REFRESH_FREQUENCY
+if /usr/bin/find "/docker-entrypoint.d/" -mindepth 1 -maxdepth 1 -type f -print -quit 2>/dev/null | read v; then
+    echo  "$0: /docker-entrypoint.d/ is not empty, will attempt to perform configuration"
 
-if [[ ${PROXY_PASS_TARGET:=""} == "" ]] ;  then
-    # in this case there is no nginx, this container only handles cert generating
-    echo ACME_CERT_PORT is $ACME_CERT_PORT
-    setupssl --port 80
-    # regularly check if ssl cert needs to be renewed
-    while true ;
-    do 
-        sleep  86000
-        setupssl --port $ACME_CERT_PORT
+    echo  "$0: Looking for shell scripts in /docker-entrypoint.d/"
+    find "/docker-entrypoint.d/" -follow -type f -print | sort -n | while read -r f; do
+        case "$f" in
+            *.sh)
+                if [ -x "$f" ]; then
+                    echo  "$0: Launching $f";
+                    "$f"
+                else
+                    # warn on shell scripts without exec bit
+                    echo  "$0: Ignoring $f, not executable";
+                fi
+                ;;
+            *) echo  "$0: Ignoring $f";;
+        esac
     done
-    exit
+
+    echo  "$0: Configuration complete; ready for start up"
+else
+    echo  "$0: No files found in /docker-entrypoint.d/, skipping configuration"
 fi
 
-echo PROXY_PASS_TARGET is $PROXY_PASS_TARGET
+setup
 
+#chown -R nginx:nginx /ssl
+
+echo "Starting nginx..."
+
+# generate dummy self signed cert for 444 if needed
+mkdir -p $(dirname $CERT_444_PATH) || true
+openssl req -x509 -newkey rsa:4096 -keyout $CERT_444_KEY_PATH -out $CERT_444_PATH -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname" > /dev/null
+
+# fire up nginx
+nginx -g "daemon off;" &
+NGINX_PID=$!
+
+# wait for master to write pid file, else later `nginx -s reload` fails
+while [ ! -s /var/run/nginx.pid ] ; do
+    kill -0 $NGINX_PID 2>/dev/null || { echo "nginx failed to start" ; exit 1 ; }
+    sleep 0.2
+done
 
 if [[ $SETUP_REFRESH_FREQUENCY > 0 ]] ; then
-    echo ACME_CERT_PORT is $ACME_CERT_PORT
-    setupssl --port 80
+    setupssl && setup && nginx -s reload
     # regularly check if ssl cert needs to be renewed
-    (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl --port $ACME_CERT_PORT; nginx -s reload ;  done) &
+    (while true ; do sleep $SETUP_REFRESH_FREQUENCY ; setupssl; setup; nginx -s reload ;  done) &
 else
     # set SETUP_REFRESH_FREQUENCY to zero if another container does the renewing
     (while true ; do sleep 86000 ; nginx -s reload ;  done) &
 fi
 
-# build a list of all env var keys
-envkeys=""
-for l in $(printenv | cut -d"=" -f1); do 
-    envkeys="$envkeys \\\$$l"
-done
-
-# support for basic auth
-if [[ ${AUTH_BASIC_USER_FILE:=""} != "" ]] ;  then
-    export AUTH_BASIC_USER_FILE="auth_basic_user_file \"$AUTH_BASIC_USER_FILE\";"
-    if [[ ${AUTH_BASIC:=""} != "" ]] ;  then
-        export AUTH_BASIC="auth_basic \"$AUTH_BASIC\";"
-    else
-        export AUTH_BASIC="auth_basic \"HTTP Authentication Required\";"
-    fi
-else
-    export AUTH_BASIC=""
-    export AUTH_BASIC_USER_FILE=""
-fi
-
-# apply env vars to template conf files
-for f in $(find  /etc/nginx/ -type f | grep .tpl$ ); do
-
-    filename=$(basename $f .tpl)
-    envsubst "'$envkeys'" < $f > $(dirname $f)/$filename
-done
-
-echo "Starting nginx..."
-
-# fire up nginx
-nginx -g "daemon off;"
+wait

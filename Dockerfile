@@ -1,68 +1,55 @@
-FROM nginx:stable-alpine
+FROM ubuntu:26.04
 
-RUN mkdir -p /ssl
+ENV DEBIAN_FRONTEND=noninteractive
 
-# acme.sh conf options
-ENV AUTO_UPGRADE 0
-ENV DOMAIN_PATH=/ssl
-ENV DOMAIN_CONF=/ssl/domain.conf
-ENV DOMAIN_SSL_CONF=/ssl/domain.csr.conf
-ENV LE_CONFIG_HOME=/etc/acme
-ENV CSR_PATH=/ssl/csr.csr
-ENV CERT_KEY_PATH=/ssl/privkey.pem
-ENV CERT_PATH=/ssl/cert.pem
-ENV ACME_CERT_PORT=8086
+RUN mkdir -p /ssl /docker-entrypoint.d
+
 ENV SETUP_REFRESH_FREQUENCY=86400
 ENV FRONT_HTTPS_PORT=443
+ENV LISTEN=8080
+ENV LISTEN_SSL=443
+ENV WORKER_PROCESSES=auto
+ENV WORKER_CONNECTIONS=2048
+ENV WORKER_AIO_REQUESTS=512
+ENV TOPLEVEL_INCLUDES=""
+ENV NGINX_USER=ubuntu
 
 # reverse proxy config
-ENV SERVER_NAME=_
-ENV PROXY_PASS_TARGET=http://example.com/path
-ENV PROXY_SSL_TRUSTED_CERTIFICATE=/ssl/cert.pem
-ENV PROXY_SSL_VERIFY=off
-ENV AUTH_BASIC=""
-ENV AUTH_BASIC_USER_FILE=""
-ENV REVERSE_PROXY_YML=""
+ENV CONF_YML="/config.yml"
+ENV CONF_OUT_DIR=/etc/nginx/conf.d
+ENV PYTHONUNBUFFERED=1
 
-EXPOSE 80 443
+# default 444 page, if used
+ENV CERT_444_PATH='/ssl/default444/cert.pem'
+ENV CERT_444_KEY_PATH='/ssl/default444/privkey.pem'
 
-RUN apk update -f \
-  && apk --no-cache add -f \
-  openssl gettext bash python3 py3-pip py-openssl \
-  coreutils \
-  bind-tools \
-  git \ 
-  build-deps build-base libffi-dev openssl-dev \
-  curl \
-  socat \
-  bash \
-  tzdata \
-  && rm -rf /var/cache/apk/* 
+EXPOSE 8080 443
 
-ADD requirements.txt / 
+RUN apt update -y \
+    && apt install -y --no-install-recommends bash openssl certbot socat libnginx-mod-http-dav-ext nginx-extras nginx gettext python3 python3-yaml python3-certbot-dns-route53 tzdata \
+    && rm -rf /var/cache/apt/*
 
-RUN pip3 install -r /requirements.txt
-
-# install acme bash implementation
-RUN mkdir -p /etc/acme \
-    && cd /root \
-    && git clone https://github.com/acmesh-official/acme.sh.git   \
-    && cd ./acme.sh \
-    && ./acme.sh --install \
-    --home /usr/local/bin \
-    --config-home /etc/acme \
-    && cd .. && rm -rf acme.sh
-
+# RUN apk update -f \
+#     && apk --no-cache add -f \
+#     openssl gettext bash python3 py3-pip \
+#     coreutils \
+#     bind-tools \
+#     curl \
+#     socat \
+#     bash \
+#     tzdata \
+#     nginx-mod-http-dav-ext nginx-full nginx \
+#     && rm -rf /var/cache/apk/*
 
 ADD *.py /usr/local/bin/
 RUN ln -s /usr/local/bin/setupssl.py  /usr/local/bin/setupssl
+RUN ln -s /usr/local/bin/setup.py  /usr/local/bin/setup
 ADD run.sh /run.sh
-RUN chmod +x /usr/local/bin/setupssl.py /run.sh
+RUN chmod +x /usr/local/bin/setup*.py /run.sh
 
-RUN rm /etc/nginx/conf.d/* 
-RUN rm /etc/nginx/nginx.conf
+RUN rm -rf /etc/nginx/conf.d/*
 
 ADD nginx.conf.tpl /etc/nginx/
-ADD reverse_proxy.conf.tpl /etc/nginx/conf.d/
+ADD nginx_*.conf.tpl /etc/nginx/conf.d/
 
 CMD ["/run.sh"]
