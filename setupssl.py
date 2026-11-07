@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 import socket
 import argparse
-from validate_email import validate_email
+import re
 
 # SSL cert stuff
 CERT_HTTP_CHALLENGE_PORT = os.environ.get('CERT_HTTP_CHALLENGE_PORT', None)
@@ -143,10 +143,8 @@ def main(fqdns, email, challenge_dns_provider=None):
     s.cert_email=email
     s.fqdns = fqdns
 
-    try:
-        if not validate_email(email):
-            raise Exception()
-    except:
+    # ponytail: syntax check only, ACME server rejects undeliverable addresses
+    if not email or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise SetupSSLException("CERT_EMAIL: The provided email for the certificate, {}, is not valid".format(email))
 
     if len(fqdns) == 0:

@@ -26,7 +26,7 @@ ENV CERT_444_KEY_PATH='/ssl/default444/privkey.pem'
 EXPOSE 8080 443
 
 RUN apt update -y \
-    && apt install -y --no-install-recommends bash openssl certbot socat libnginx-mod-http-dav-ext nginx-extras nginx gettext python3 python3-yaml python3-certbot-dns-route53 tzdata \
+    && apt install -y --no-install-recommends bash openssl certbot socat libnginx-mod-http-dav-ext nginx-extras nginx gettext python3 python3-cryptography python3-yaml python3-certbot-dns-route53 tzdata \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # RUN apk update -f \
